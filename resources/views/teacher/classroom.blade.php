@@ -26,6 +26,9 @@
             useConfirm: null,
             useBusy: false,
             useError: '',
+            deleteConfirm: null,
+            deleteBusy: false,
+            deleteError: '',
             regModal: null,
             regSaving: false,
             regError: '',
@@ -192,20 +195,52 @@
                     this.posting = false;
                 }
             },
-            async removeAnnouncement(a) {
-                if (!confirm('Delete this announcement?')) return;
-                try {
-                    await window.TeacherClassroom.deleteAnnouncement(this.classId, a.id);
-                    this.announcements = this.announcements.filter((x) => x.id !== a.id);
-                } catch (e) { alert(e.message || 'Delete failed'); }
+            openDeleteAnnouncement(a) {
+                this.deleteError = '';
+                this.deleteConfirm = {
+                    kind: 'announcement',
+                    id: a.id,
+                    title: 'Delete announcement?',
+                    message: 'This removes the post from the class stream. Students will no longer see it.',
+                };
             },
-            async removeActivity(act) {
-                if (!confirm('Delete activity “' + (act.title || 'Untitled') + '”?')) return;
-                try {
-                    await window.TeacherClassroom.deleteActivity(act.id);
-                    this.activities = this.activities.filter((x) => x.id !== act.id);
-                } catch (e) { alert(e.message || 'Delete failed'); }
+            openDeleteActivity(act) {
+                this.deleteError = '';
+                this.deleteConfirm = {
+                    kind: 'activity',
+                    id: act.id,
+                    title: 'Delete activity?',
+                    message: '“' + (act.title || 'Untitled') + '” will be removed from this class. Student submissions for it may also be affected.',
+                };
             },
+            cancelDelete() {
+                if (this.deleteBusy) return;
+                this.deleteConfirm = null;
+                this.deleteError = '';
+            },
+            async confirmDelete() {
+                if (!this.deleteConfirm || this.deleteBusy) return;
+                this.deleteBusy = true;
+                this.deleteError = '';
+                const { kind, id } = this.deleteConfirm;
+                try {
+                    if (kind === 'announcement') {
+                        await window.TeacherClassroom.deleteAnnouncement(this.classId, id);
+                        this.announcements = this.announcements.filter((x) => x.id !== id);
+                    } else if (kind === 'activity') {
+                        await window.TeacherClassroom.deleteActivity(id);
+                        this.activities = this.activities.filter((x) => x.id !== id);
+                    }
+                    this.deleteConfirm = null;
+                } catch (e) {
+                    this.deleteError = e.message || 'Delete failed.';
+                } finally {
+                    this.deleteBusy = false;
+                }
+            },
+            // Backward-compatible names used in stream/activities partials
+            removeAnnouncement(a) { this.openDeleteAnnouncement(a); },
+            removeActivity(act) { this.openDeleteActivity(act); },
             /** Load template into form (shared by View / Use). */
             loadTplForm(t) {
                 this.tplError = '';
@@ -1003,6 +1038,28 @@
         @include('teacher.classroom.template-editor')
         @include('teacher.classroom.regular-editor')
         @include('teacher.classroom.qr-modal')
+
+
+        {{-- Confirm: Delete announcement / activity --}}
+        <div x-show="deleteConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+            <div class="absolute inset-0 bg-slate-900/40" @click="cancelDelete()"></div>
+            <div class="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+                <h3 class="text-base font-black text-slate-800" x-text="deleteConfirm?.title || 'Delete?'"></h3>
+                <p class="mt-2 text-xs leading-relaxed text-slate-600" x-text="deleteConfirm?.message || ''"></p>
+                <p class="mt-2 text-[11px] text-slate-400">This cannot be undone.</p>
+                <p x-show="deleteError" x-text="deleteError" class="mt-3 text-xs font-bold text-red-500"></p>
+                <div class="mt-5 flex justify-end gap-2">
+                    <button type="button" @click="cancelDelete()" :disabled="deleteBusy"
+                            class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                        Cancel
+                    </button>
+                    <button type="button" @click="confirmDelete()" :disabled="deleteBusy"
+                            class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50">
+                        <span x-text="deleteBusy ? 'Deleting…' : 'Delete'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         {{-- Confirm: Use template → draft --}}
         <div x-show="useConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">

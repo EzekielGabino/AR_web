@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Services\FcmPushService;
 use App\Services\Supabase\SupabaseClient;
 use App\Services\Supabase\SupabaseRest;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class TeacherDataController extends Controller
     public function __construct(
         protected SupabaseRest $db,
         protected SupabaseClient $supabase,
+        protected FcmPushService $fcm,
     ) {}
 
     protected function uid(Request $request): string
@@ -173,6 +175,7 @@ class TeacherDataController extends Controller
         if (! $existing || ($existing[0]['teacher_id'] ?? '') !== $uid) {
             return response()->json(['message' => 'Forbidden or not found.'], 403);
         }
+        $this->deleteNotificationsForClass($id);
         $this->db->delete('classes', 'id', $id);
 
         return response()->json(['ok' => true]);
@@ -230,6 +233,14 @@ class TeacherDataController extends Controller
             null,
         );
 
+        $this->notifyClassStudents(
+            $classId,
+            'announcement_posted',
+            'New announcement',
+            $this->excerpt($data['body'], 120),
+            null,
+        );
+
         return response()->json([
             'id' => $row['id'],
             'body' => $row['body'] ?? '',
@@ -270,6 +281,8 @@ class TeacherDataController extends Controller
     {
         $this->assertClassOwner($request, $classId);
         $this->db->delete('announcements', 'id', $id);
+        // Remove related teacher/student notification cards for this class stream post
+        $this->deleteNotificationsByClassAndType($classId, 'announcement_posted');
 
         return response()->json(['ok' => true]);
     }
@@ -410,6 +423,14 @@ class TeacherDataController extends Controller
                 $rows[0]['class_id'],
                 $id,
             );
+
+            $this->notifyClassStudents(
+                $rows[0]['class_id'],
+                'activity_published',
+                'New activity',
+                $title,
+                $id,
+            );
         }
 
         return response()->json($mapped);
@@ -422,6 +443,7 @@ class TeacherDataController extends Controller
             return response()->json(['message' => 'Not found.'], 404);
         }
         $this->assertClassOwner($request, $rows[0]['class_id']);
+        $this->deleteNotificationsForActivity($id);
         $this->db->delete('class_activities', 'id', $id);
 
         return response()->json(['ok' => true]);
@@ -523,6 +545,19 @@ class TeacherDataController extends Controller
         ]);
 
         $row = $updated[0] ?? array_merge($subs[0], $patch);
+
+        $studentId = $row['student_id'] ?? $subs[0]['student_id'] ?? null;
+        $actTitle = $acts[0]['title'] ?? 'Activity';
+        if ($studentId) {
+            $this->notifyStudent(
+                (string) $studentId,
+                'activity_returned',
+                'Activity returned',
+                $actTitle.' — score: '.($row['score'] ?? $data['score']),
+                $acts[0]['class_id'] ?? null,
+                $activityId,
+            );
+        }
 
         return response()->json([
             'id' => $row['id'],
@@ -713,6 +748,62 @@ class TeacherDataController extends Controller
         return response()->json(['ok' => true, 'readAt' => $now]);
     }
 
+
+    protected function deleteNotificationsForClass(string $classId): void
+    {
+        try {
+            foreach (['teacher_notifications', 'student_notifications'] as $table) {
+                $rows = $this->db->get($table, ['class_id' => 'eq.'.$classId, 'select' => 'id']);
+                foreach ($rows as $r) {
+                    if (! empty($r['id'])) {
+                        $this->db->delete($table, 'id', $r['id']);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    protected function deleteNotificationsByClassAndType(string $classId, string $type): void
+    {
+        try {
+            foreach (['teacher_notifications', 'student_notifications'] as $table) {
+                $rows = $this->db->get($table, [
+                    'class_id' => 'eq.'.$classId,
+                    'type' => 'eq.'.$type,
+                    'select' => 'id',
+                ]);
+                foreach ($rows as $r) {
+                    if (! empty($r['id'])) {
+                        $this->db->delete($table, 'id', $r['id']);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    protected function deleteNotificationsForActivity(string $activityId): void
+    {
+        try {
+            foreach (['teacher_notifications', 'student_notifications'] as $table) {
+                $rows = $this->db->get($table, [
+                    'activity_id' => 'eq.'.$activityId,
+                    'select' => 'id',
+                ]);
+                foreach ($rows as $r) {
+                    if (! empty($r['id'])) {
+                        $this->db->delete($table, 'id', $r['id']);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
     protected function notifyTeacher(
         string $teacherId,
         string $type,
@@ -736,7 +827,69 @@ class TeacherDataController extends Controller
         }
     }
 
-    protected function classLabel(string $classId): string
+    
+    protected function notifyStudent(
+        string $userId,
+        string $type,
+        string $title,
+        string $body,
+        ?string $classId,
+        ?string $activityId,
+    ): void {
+        try {
+            $this->db->insert('student_notifications', array_filter([
+                'user_id' => $userId,
+                'type' => $type,
+                'title' => $title,
+                'body' => $body,
+                'class_id' => $classId,
+                'activity_id' => $activityId,
+            ], fn ($v) => $v !== null && $v !== ''));
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        try {
+            $this->fcm->sendToUser($userId, $title, $body, [
+                'type' => $type,
+                'classId' => $classId ?? '',
+                'activityId' => $activityId ?? '',
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /** Notify every student member of a class (not the teacher). */
+    protected function notifyClassStudents(
+        string $classId,
+        string $type,
+        string $title,
+        string $body,
+        ?string $activityId,
+    ): void {
+        try {
+            $members = $this->db->get('class_members', [
+                'class_id' => 'eq.'.$classId,
+                'select' => 'user_id,role',
+            ]);
+            foreach ($members as $m) {
+                $role = strtolower((string) ($m['role'] ?? 'student'));
+                if ($role === 'co_teacher' || $role === 'teacher') {
+                    continue;
+                }
+                $uid = $m['user_id'] ?? null;
+                if (! $uid) {
+                    continue;
+                }
+                $this->notifyStudent((string) $uid, $type, $title, $body, $classId, $activityId);
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+protected function classLabel(string $classId): string
     {
         $rows = $this->db->get('classes', [
             'id' => 'eq.'.$classId,
