@@ -227,6 +227,20 @@ export async function deleteActivityAttachment(activityId, storagePath) {
     });
 }
 
+export async function approveMember(classId, userId) {
+    return api(`/api/teacher/classes/${classId}/members/${userId}/approve`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+    });
+}
+
+export async function rejectMember(classId, userId) {
+    return api(`/api/teacher/classes/${classId}/members/${userId}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+    });
+}
+
 window.TeacherClassroom = {
     loadClass,
     fetchAnnouncements,
@@ -249,4 +263,6 @@ window.TeacherClassroom = {
     returnActivitySubmission,
     uploadActivityAttachment,
     deleteActivityAttachment,
+    approveMember,
+    rejectMember,
 };

@@ -96,11 +96,47 @@ class SupabaseAuth
 
     /**
      * Email/password sign-up (teacher).
+     * Uses Admin API when service role is configured so the email is
+     * pre-confirmed (avoids "Confirm email" blocking immediate sign-in).
      *
-     * @return array<string, mixed>
+     * @return array<string, mixed> Prefer shape with access_token + user when possible
      */
     public function signUp(string $email, string $password, string $name): array
     {
+        // Preferred path: service role creates a confirmed user
+        if ($this->client->serviceConfigured()) {
+            $admin = $this->client->service()
+                ->acceptJson()
+                ->post('/auth/v1/admin/users', [
+                    'email' => $email,
+                    'password' => $password,
+                    'email_confirm' => true,
+                    'user_metadata' => [
+                        'full_name' => $name,
+                        'name' => $name,
+                        'role' => 'teacher',
+                    ],
+                ]);
+
+            if (! $admin->successful()) {
+                $msg = $admin->json('msg')
+                    ?? $admin->json('error_description')
+                    ?? $admin->json('message')
+                    ?? 'Registration failed.';
+                // User already exists → fall through to password sign-in attempt by caller
+                throw new RuntimeException(is_string($msg) ? $msg : 'Registration failed.');
+            }
+
+            // Admin create returns the user object (not a session). Caller signs in next.
+            $user = $admin->json();
+            if (isset($user['id'])) {
+                return ['user' => $user];
+            }
+
+            return is_array($user) ? $user : [];
+        }
+
+        // Fallback: public signup (may require email confirmation)
         $response = Http::baseUrl($this->base())
             ->withHeaders([
                 'apikey' => $this->anonKey(),

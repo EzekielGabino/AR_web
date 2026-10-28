@@ -19,30 +19,52 @@ class LoginController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
             'email' => 'required|email',
             'password' => 'required|min:6',
         ]);
 
+        $displayName = strstr($request->email, '@', true) ?: $request->email;
+
         try {
-            $this->supabaseAuth->signUp(
+            $signUp = $this->supabaseAuth->signUp(
                 $request->email,
                 $request->password,
-                $request->name
+                $displayName
             );
 
-            // Sign in immediately after sign-up
-            $tokenPayload = $this->supabaseAuth->signInWithPassword(
-                $request->email,
-                $request->password
-            );
+            // Admin signup returns user only; public signup may return a session.
+            if (! empty($signUp['access_token']) && ! empty($signUp['user']['id'])) {
+                $tokenPayload = $signUp;
+            } else {
+                try {
+                    $tokenPayload = $this->supabaseAuth->signInWithPassword(
+                        $request->email,
+                        $request->password
+                    );
+                } catch (Throwable $e) {
+                    return back()
+                        ->withInput()
+                        ->with('auth_mode', 'register')
+                        ->withErrors([
+                            'email' => 'Account was created but automatic sign-in failed: '.$e->getMessage()
+                                .'. Try Sign in with the same email and password. '
+                                .'If it still fails, delete the user in Supabase Authentication → Users and register again.',
+                        ]);
+                }
+            }
 
-            $authUser = $tokenPayload['user'];
+            $authUser = $tokenPayload['user'] ?? null;
+            if (! is_array($authUser) || empty($authUser['id'])) {
+                return back()
+                    ->withInput()
+                    ->with('auth_mode', 'register')
+                    ->withErrors(['email' => 'Registration response was incomplete. Check Supabase Auth logs.']);
+            }
             $profile = $this->supabaseAuth->upsertTeacherProfile([
                 'id' => $authUser['id'],
                 'email' => $authUser['email'] ?? $request->email,
                 'user_metadata' => array_merge($authUser['user_metadata'] ?? [], [
-                    'full_name' => $request->name,
+                    'full_name' => $displayName,
                     'role' => 'teacher',
                 ]),
             ]);
@@ -52,7 +74,7 @@ class LoginController extends Controller
                 app(\App\Services\Supabase\SupabaseClient::class)->service()
                     ->patch('/rest/v1/profiles?id=eq.'.$authUser['id'], [
                         'has_password_set' => true,
-                        'display_name' => $request->name,
+                        'display_name' => $displayName,
                         'role' => 'teacher',
                     ]);
                 $profile['has_password_set'] = true;
@@ -64,9 +86,12 @@ class LoginController extends Controller
 
             return redirect()->route('dashboard');
         } catch (Throwable $e) {
-            return back()->withInput()->withErrors([
-                'email' => $e->getMessage() ?: 'Registration failed.',
-            ]);
+            return back()
+                ->withInput()
+                ->with('auth_mode', 'register')
+                ->withErrors([
+                    'email' => $e->getMessage() ?: 'Registration failed.',
+                ]);
         }
     }
 

@@ -3,10 +3,10 @@
 @section('title', 'Class workspace — SciLens AR')
 
 @section('content')
-    @include('teacher.partials.topbar')
+@include('teacher.partials.topbar')
 
-    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6"
-         x-data="{
+<div class="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6"
+    x-data="{
             classId: @js($classId),
             tab: (new URLSearchParams(window.location.search).get('tab') || 'stream'),
             activityTab: 'regular',
@@ -26,6 +26,9 @@
             useConfirm: null,
             useBusy: false,
             useError: '',
+            deleteConfirm: null,
+            deleteBusy: false,
+            deleteError: '',
             regModal: null,
             regSaving: false,
             regError: '',
@@ -192,20 +195,52 @@
                     this.posting = false;
                 }
             },
-            async removeAnnouncement(a) {
-                if (!confirm('Delete this announcement?')) return;
-                try {
-                    await window.TeacherClassroom.deleteAnnouncement(this.classId, a.id);
-                    this.announcements = this.announcements.filter((x) => x.id !== a.id);
-                } catch (e) { alert(e.message || 'Delete failed'); }
+            openDeleteAnnouncement(a) {
+                this.deleteError = '';
+                this.deleteConfirm = {
+                    kind: 'announcement',
+                    id: a.id,
+                    title: 'Delete announcement?',
+                    message: 'This removes the post from the class stream. Students will no longer see it.',
+                };
             },
-            async removeActivity(act) {
-                if (!confirm('Delete activity “' + (act.title || 'Untitled') + '”?')) return;
-                try {
-                    await window.TeacherClassroom.deleteActivity(act.id);
-                    this.activities = this.activities.filter((x) => x.id !== act.id);
-                } catch (e) { alert(e.message || 'Delete failed'); }
+            openDeleteActivity(act) {
+                this.deleteError = '';
+                this.deleteConfirm = {
+                    kind: 'activity',
+                    id: act.id,
+                    title: 'Delete activity?',
+                    message: '“' + (act.title || 'Untitled') + '” will be removed from this class. Student submissions for it may also be affected.',
+                };
             },
+            cancelDelete() {
+                if (this.deleteBusy) return;
+                this.deleteConfirm = null;
+                this.deleteError = '';
+            },
+            async confirmDelete() {
+                if (!this.deleteConfirm || this.deleteBusy) return;
+                this.deleteBusy = true;
+                this.deleteError = '';
+                const { kind, id } = this.deleteConfirm;
+                try {
+                    if (kind === 'announcement') {
+                        await window.TeacherClassroom.deleteAnnouncement(this.classId, id);
+                        this.announcements = this.announcements.filter((x) => x.id !== id);
+                    } else if (kind === 'activity') {
+                        await window.TeacherClassroom.deleteActivity(id);
+                        this.activities = this.activities.filter((x) => x.id !== id);
+                    }
+                    this.deleteConfirm = null;
+                } catch (e) {
+                    this.deleteError = e.message || 'Delete failed.';
+                } finally {
+                    this.deleteBusy = false;
+                }
+            },
+            // Backward-compatible names used in stream/activities partials
+            removeAnnouncement(a) { this.openDeleteAnnouncement(a); },
+            removeActivity(act) { this.openDeleteActivity(act); },
             /** Load template into form (shared by View / Use). */
             loadTplForm(t) {
                 this.tplError = '';
@@ -250,7 +285,7 @@
                 this.tplModal = 'edit-lab';
             },
             async saveLabContent() {
-                if (this.tplModal !== 'edit-lab' || !this.tplActive?.id) return;
+                if (this.tplModal !== 'edit-lab' || !this.tplActive) return;
                 this.tplSaving = true;
                 this.tplError = '';
                 try {
@@ -293,6 +328,17 @@
                             steps: form.steps,
                         },
                     };
+                    // New blank: create on first Save only (Cancel leaves nothing in the DB)
+                    if (!this.tplActive.id) {
+                        const created = await window.TeacherClassroom.assignLabFromTemplate(
+                            this.classId,
+                            { ...form, ...patch },
+                            null
+                        );
+                        this.activities = [created, ...this.activities];
+                        this.closeTplModal();
+                        return;
+                    }
                     await window.TeacherClassroom.updateClassActivity(this.tplActive.id, patch);
                     this.activities = this.activities.map((a) =>
                         a.id === this.tplActive.id ? { ...a, ...patch } : a
@@ -340,34 +386,29 @@
                     this.useBusy = false;
                 }
             },
-            /** Blank lab draft (not from a template) for this class. */
-            async createBlankLab() {
-                try {
-                    const form = {
-                        title: 'Untitled lab',
-                        labCategory: 'Concentration',
-                        description: '',
-                        safetyTips: '',
-                        apparatus: [],
-                        elements: [],
-                        steps: [],
-                        quiz: [],
-                        dueDate: '',
-                        dueTime: '',
-                    };
-                    const created = await window.TeacherClassroom.assignLabFromTemplate(
-                        this.classId,
-                        form,
-                        null
-                    );
-                    this.activities = [created, ...this.activities];
-                    this.activityTab = 'lab';
-                    this.tab = 'activities';
-                    this.openLabEdit(created);
-                } catch (e) {
-                    console.error(e);
-                    alert(e.message || 'Could not create lab draft.');
-                }
+            /** Open editor for a new lab; persist only when teacher saves (Cancel discards). */
+            createBlankLab() {
+                const blank = {
+                    id: null,
+                    title: 'Untitled lab',
+                    labCategory: 'Concentration',
+                    description: '',
+                    safetyTips: '',
+                    apparatus: [],
+                    elements: [],
+                    steps: [],
+                    quiz: [],
+                    attachments: [],
+                    published: false,
+                    status: 'draft',
+                    _isNewBlank: true,
+                };
+                this.loadTplForm(blank);
+                this.tplActive = blank;
+                this.tplModal = 'edit-lab';
+                this.tplError = '';
+                this.activityTab = 'lab';
+                this.tab = 'activities';
             },
             closeTplModal() {
                 this.tplModal = null;
@@ -897,6 +938,31 @@
             students() {
                 return Array.isArray(this.classData?.students) ? this.classData.students : [];
             },
+            pendingStudents() {
+                return Array.isArray(this.classData?.pendingStudents) ? this.classData.pendingStudents : [];
+            },
+            async refreshClass() {
+                this.classData = await window.TeacherClassroom.loadClass(this.classId);
+            },
+            async approveStudent(s) {
+                if (!s?.uid) return;
+                try {
+                    await window.TeacherClassroom.approveMember(this.classId, s.uid);
+                    await this.refreshClass();
+                } catch (e) {
+                    alert(e.message || 'Could not approve student.');
+                }
+            },
+            async rejectStudent(s) {
+                if (!s?.uid) return;
+                if (!confirm('Decline this join request?')) return;
+                try {
+                    await window.TeacherClassroom.rejectMember(this.classId, s.uid);
+                    await this.refreshClass();
+                } catch (e) {
+                    alert(e.message || 'Could not decline request.');
+                }
+            },
             studentLabel(s) {
                 if (!s) return 'Student';
                 if (typeof s === 'string') return s;
@@ -933,117 +999,143 @@
             activityShowUrl(activityId) {
                 return @js(url('/classes')) + '/' + this.classId + '/activities/' + activityId;
             },
-         }"
->
-        <div x-show="loading" class="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs font-semibold text-slate-500">Loading class…</div>
-        <div x-show="!loading && error" x-cloak class="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-bold text-red-600" x-text="error"></div>
+         }">
+    <div x-show="loading" class="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs font-semibold text-slate-500">Loading class…</div>
+    <div x-show="!loading && error" x-cloak class="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-bold text-red-600" x-text="error"></div>
 
-        <template x-if="!loading && !error && classData">
-            <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
-                {{-- Left sidebar --}}
-                <aside class="w-full shrink-0 lg:sticky lg:top-20 lg:w-64 lg:self-start">
-                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                        <a href="{{ route('dashboard') }}?tab=classes"
-                           class="mb-4 inline-flex text-[11px] font-bold text-slate-400 transition hover:text-[#50aed0]">← Classes</a>
+    <template x-if="!loading && !error && classData">
+        <div class="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-start lg:gap-8">
+            {{-- Left sidebar: stacks on phone, sticky column on desktop --}}
+            <aside class="w-full shrink-0 lg:sticky lg:top-24 lg:w-72 lg:self-start">
+                <div class="relative overflow-hidden rounded-3xl border border-[#ABD2FA]/60 bg-white/95 p-4 shadow-xl shadow-[#1B2CC1]/5 backdrop-blur-md sm:rounded-[2.5rem] sm:p-6">
+                    {{-- Top Decorative Glow Accent --}}
+                    <div class="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[#ABD2FA]/30 blur-2xl"></div>
 
-                        <h1 class="text-lg font-black leading-snug text-slate-800" x-text="classData.section_name"></h1>
-                        <p class="mt-1 text-xs font-semibold text-slate-500">
-                            <span x-text="classData.grade_level || '—'"></span>
-                            <template x-if="classData.subject">
-                                <span>
-                                    <span class="text-slate-300"> · </span>
-                                    <span x-text="classData.subject"></span>
-                                </span>
-                            </template>
-                        </p>
+                    <a href="{{ route('dashboard') }}?tab=classes"
+                        class="mb-4 inline-flex items-center gap-1.5 text-xs font-extrabold text-[#091540]/60 transition-colors hover:text-[#1B2CC1]">
+                        <span>←</span> Classes
+                    </a>
 
-                        <div class="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
-                            <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Access code</p>
-                            <p class="mt-0.5 font-mono text-base font-black tracking-wider text-[#50aed0]" x-text="classData.access_code"></p>
-                        </div>
+                    <h1 class="text-xl font-black leading-snug text-[#091540]" x-text="classData.section_name"></h1>
+                    <p class="mt-1.5 text-xs font-bold text-[#091540]/60">
+                        <span x-text="classData.grade_level || '—'"></span>
+                        <template x-if="classData.subject">
+                            <span>
+                                <span class="text-[#1B2CC1] font-black"> · </span>
+                                <span x-text="classData.subject"></span>
+                            </span>
+                        </template>
+                    </p>
 
-                        <button type="button" @click="openQr()"
-                                class="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-[#7CD5F3] hover:bg-[#7CD5F3]/10 hover:text-[#439BBB]">
-                            Show QR / code
-                        </button>
+                    <div class="mt-5 rounded-2xl border border-[#ABD2FA]/50 bg-slate-50/80 p-4 backdrop-blur-xs">
+                        <p class="text-[10px] font-extrabold uppercase tracking-wider text-[#091540]/60">Access code</p>
+                        <p class="mt-1 font-mono text-base font-black tracking-wider text-[#1B2CC1]" x-text="classData.access_code"></p>
+                    </div>
 
-                        <nav class="mt-5 space-y-1 border-t border-slate-100 pt-4">
-                            <p class="mb-2 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">Navigate</p>
+                    <button type="button" @click="openQr()"
+                        class="cursor-pointer mt-3.5 w-full rounded-2xl border-[1.5px] border-[#ABD2FA]/80 bg-white px-4 py-3 text-xs font-extrabold text-[#091540] transition-all hover:border-[#1B2CC1] hover:bg-[#ABD2FA]/15 hover:shadow-md hover:shadow-[#1B2CC1]/5">
+                        Show QR / code
+                    </button>
+
+                    <nav class="mt-4 border-t border-[#ABD2FA]/40 pt-4 sm:mt-6 sm:pt-5">
+                        <p class="mb-2 hidden px-2 text-[10px] font-extrabold uppercase tracking-wider text-[#091540]/60 lg:block">Navigate</p>
+                        {{-- Phone: horizontal tabs · Desktop: vertical list --}}
+                        <div class="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:flex-col lg:space-y-1.5 lg:overflow-visible lg:pb-0 [&::-webkit-scrollbar]:hidden">
                             <template x-for="t in [
-                                { id: 'stream', label: 'Stream' },
-                                { id: 'activities', label: 'Activities' },
-                                { id: 'people', label: 'Students' },
-                            ]" :key="t.id">
+                            { id: 'stream', label: 'Stream' },
+                            { id: 'activities', label: 'Activities' },
+                            { id: 'people', label: 'Students' },
+                        ]" :key="t.id">
                                 <button type="button"
-                                        @click="selectTab(t.id)"
-                                        class="flex w-full items-center rounded-xl px-3 py-2.5 text-left text-xs font-bold transition"
-                                        :class="tab === t.id
-                                            ? 'bg-[#7CD5F3]/20 text-[#2a7a96] ring-1 ring-[#7CD5F3]/40'
-                                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'">
+                                    @click="selectTab(t.id)"
+                                    class="cursor-pointer flex shrink-0 items-center rounded-2xl px-4 py-2.5 text-left text-xs font-extrabold transition-all sm:py-3 lg:w-full"
+                                    :class="tab === t.id
+                                        ? 'bg-[#1B2CC1] text-white shadow-md shadow-[#1B2CC1]/30 ring-1 ring-[#7692FF]/50'
+                                        : 'bg-[#ABD2FA]/15 text-[#091540]/70 hover:bg-[#ABD2FA]/25 hover:text-[#091540] lg:bg-transparent'">
                                     <span x-text="t.label"></span>
                                 </button>
                             </template>
-                        </nav>
-                    </div>
-                </aside>
-
-                {{-- Main panel --}}
-                <main class="min-w-0 flex-1 space-y-4">
-                    <div class="hidden items-center justify-between sm:flex lg:hidden">
-                        <p class="text-sm font-black text-slate-800" x-text="classData.section_name"></p>
-                    </div>
-
-                    @include('teacher.classroom.stream')
-                    @include('teacher.classroom.activities')
-                    @include('teacher.classroom.students')
-                </main>
-            </div>
-        </template>
-
-        @include('teacher.classroom.template-editor')
-        @include('teacher.classroom.regular-editor')
-        @include('teacher.classroom.qr-modal')
-
-        {{-- Confirm: Use template → draft --}}
-        <div x-show="useConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-            <div class="absolute inset-0 bg-slate-900/40" @click="cancelUseTemplate()"></div>
-            <div class="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
-                <h3 class="text-base font-black text-slate-800">Add template as draft?</h3>
-                <p class="mt-2 text-xs leading-relaxed text-slate-600">
-                    <span class="font-bold text-slate-800" x-text="useConfirm?.title || 'This template'"></span>
-                    will be copied into this class’s
-                    <span class="font-semibold">Lab activities</span> as an unpublished draft.
-                    Students will not see it until you set a deadline and publish.
-                </p>
-                <p class="mt-2 text-[11px] text-slate-400">The shared template catalog will not be changed.</p>
-                <p x-show="useError" x-text="useError" class="mt-3 text-xs font-bold text-red-500"></p>
-                <div class="mt-5 flex justify-end gap-2">
-                    <button type="button" @click="cancelUseTemplate()" :disabled="useBusy"
-                            class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-                        Cancel
-                    </button>
-                    <button type="button" @click="confirmUseTemplate()" :disabled="useBusy"
-                            class="rounded-xl bg-[#7CD5F3] px-4 py-2 text-xs font-bold text-white hover:bg-[#68cbed] disabled:opacity-50">
-                        <span x-text="useBusy ? 'Adding…' : 'Add draft'"></span>
-                    </button>
+                        </div>
+                    </nav>
                 </div>
+            </aside>
+
+            {{-- Main panel --}}
+            <main class="min-w-0 flex-1 space-y-4 sm:space-y-6">
+
+                @include('teacher.classroom.stream')
+                @include('teacher.classroom.activities')
+                @include('teacher.classroom.students')
+            </main>
+        </div>
+    </template>
+
+    @include('teacher.classroom.template-editor')
+    @include('teacher.classroom.regular-editor')
+    @include('teacher.classroom.qr-modal')
+
+
+    {{-- Confirm: Delete announcement / activity --}}
+    <div x-show="deleteConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div class="absolute inset-0 bg-slate-900/40" @click="cancelDelete()"></div>
+        <div class="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h3 class="text-base font-black text-slate-800" x-text="deleteConfirm?.title || 'Delete?'"></h3>
+            <p class="mt-2 text-xs leading-relaxed text-slate-600" x-text="deleteConfirm?.message || ''"></p>
+            <p class="mt-2 text-[11px] text-slate-400">This cannot be undone.</p>
+            <p x-show="deleteError" x-text="deleteError" class="mt-3 text-xs font-bold text-red-500"></p>
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" @click="cancelDelete()" :disabled="deleteBusy"
+                    class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                    Cancel
+                </button>
+                <button type="button" @click="confirmDelete()" :disabled="deleteBusy"
+                    class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50">
+                    <span x-text="deleteBusy ? 'Deleting…' : 'Delete'"></span>
+                </button>
             </div>
         </div>
     </div>
+
+    {{-- Confirm: Use template → draft --}}
+    <div x-show="useConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div class="absolute inset-0 bg-slate-900/40" @click="cancelUseTemplate()"></div>
+        <div class="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h3 class="text-base font-black text-slate-800">Add template as draft?</h3>
+            <p class="mt-2 text-xs leading-relaxed text-slate-600">
+                <span class="font-bold text-slate-800" x-text="useConfirm?.title || 'This template'"></span>
+                will be copied into this class’s
+                <span class="font-semibold">Lab activities</span> as an unpublished draft.
+                Students will not see it until you set a deadline and publish.
+            </p>
+            <p class="mt-2 text-[11px] text-slate-400">The shared template catalog will not be changed.</p>
+            <p x-show="useError" x-text="useError" class="mt-3 text-xs font-bold text-red-500"></p>
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" @click="cancelUseTemplate()" :disabled="useBusy"
+                    class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                    Cancel
+                </button>
+                <button type="button" @click="confirmUseTemplate()" :disabled="useBusy"
+                    class="rounded-xl bg-[#7CD5F3] px-4 py-2 text-xs font-bold text-white hover:bg-[#68cbed] disabled:opacity-50">
+                    <span x-text="useBusy ? 'Adding…' : 'Add draft'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
-    @php
-        $googlePickerConfig = [
-            'clientId' => config('services.google.client_id'),
-            'apiKey' => config('services.google.api_key'),
-            'appId' => config('services.google.app_id'),
-        ];
-    @endphp
-    <script>
-        window.__googlePickerConfig = @json($googlePickerConfig);
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script type="module" src="{{ asset('js/teacher/classroom.js') }}"></script>
-    <script type="module" src="{{ asset('js/teacher/google-drive-picker.js') }}"></script>
+@php
+$googlePickerConfig = [
+'clientId' => config('services.google.client_id'),
+'apiKey' => config('services.google.api_key'),
+'appId' => config('services.google.app_id'),
+];
+@endphp
+<script>
+    window.__googlePickerConfig = @json($googlePickerConfig);
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module" src="{{ asset('js/teacher/classroom.js') }}"></script>
+<script type="module" src="{{ asset('js/teacher/google-drive-picker.js') }}"></script>
 @endpush

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Services\FcmPushService;
 use App\Services\Supabase\SupabaseClient;
 use App\Services\Supabase\SupabaseRest;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class TeacherDataController extends Controller
     public function __construct(
         protected SupabaseRest $db,
         protected SupabaseClient $supabase,
+        protected FcmPushService $fcm,
     ) {}
 
     protected function uid(Request $request): string
@@ -90,28 +92,115 @@ class TeacherDataController extends Controller
 
         $members = $this->db->get('class_members', [
             'class_id' => 'eq.'.$id,
-            'select' => 'user_id,role,joined_at,profiles(id,display_name,email,photo_url)',
+            'select' => 'user_id,role,status,joined_at,profiles(id,display_name,email,photo_url)',
         ]);
 
         $students = [];
+        $pendingStudents = [];
         foreach ($members as $m) {
-            $p = $m['profiles'] ?? null;
-            if (is_array($p)) {
-                $students[] = [
-                    'uid' => $p['id'] ?? $m['user_id'],
-                    'name' => $p['display_name'] ?? null,
-                    'email' => $p['email'] ?? null,
-                    'photoUrl' => $p['photo_url'] ?? null,
-                ];
-            } else {
-                $students[] = ['uid' => $m['user_id']];
+            $status = strtolower((string) ($m['status'] ?? 'approved'));
+            // Legacy rows without status column → treat as approved
+            if ($status === '' || $status === 'null') {
+                $status = 'approved';
             }
+            $role = strtolower((string) ($m['role'] ?? 'student'));
+            if (in_array($role, ['teacher', 'co_teacher'], true)) {
+                continue;
+            }
+
+            $prof = $m['profiles'] ?? null;
+            $entry = is_array($prof)
+                ? [
+                    'uid' => $prof['id'] ?? $m['user_id'],
+                    'name' => $prof['display_name'] ?? null,
+                    'email' => $prof['email'] ?? null,
+                    'photoUrl' => $prof['photo_url'] ?? null,
+                    'status' => $status,
+                    'joined_at' => $m['joined_at'] ?? null,
+                ]
+                : [
+                    'uid' => $m['user_id'],
+                    'status' => $status,
+                    'joined_at' => $m['joined_at'] ?? null,
+                ];
+
+            if ($status === 'pending') {
+                $pendingStudents[] = $entry;
+            } elseif ($status === 'approved') {
+                $students[] = $entry;
+            }
+            // rejected: omit from lists
         }
 
         $mapped = $this->mapClass($rows[0]);
         $mapped['students'] = $students;
+        $mapped['pendingStudents'] = $pendingStudents;
 
         return response()->json($mapped);
+    }
+
+    /**
+     * Approve a pending class_members row (teacher only).
+     */
+    public function approveMember(Request $request, string $classId, string $userId)
+    {
+        $this->assertClassOwner($request, $classId);
+
+        $resp = $this->supabase->service()
+            ->withHeaders(['Prefer' => 'return=minimal'])
+            ->patch(
+                '/rest/v1/class_members?class_id=eq.'.$classId.'&user_id=eq.'.$userId,
+                ['status' => 'approved']
+            );
+        if (! $resp->successful()) {
+            return response()->json([
+                'message' => 'Could not approve member: '.$resp->body(),
+            ], 500);
+        }
+
+        // Attach classroom on student profile so mobile AuthGate opens MainScreen
+        try {
+            $classRows = $this->db->get('classes', [
+                'id' => 'eq.'.$classId,
+                'select' => 'section_name,access_code',
+                'limit' => 1,
+            ]);
+            $section = $classRows[0]['section_name'] ?? null;
+            $code = $classRows[0]['access_code'] ?? null;
+            $this->db->update('profiles', 'id', $userId, [
+                'classroom_id' => $classId,
+                'classroom_name' => $section,
+                'classroom_access_code' => $code,
+                'classroom_joined_at' => now()->toIso8601String(),
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return response()->json(['ok' => true, 'status' => 'approved']);
+    }
+
+    /**
+     * Reject / remove a pending join request (teacher only).
+     */
+    public function rejectMember(Request $request, string $classId, string $userId)
+    {
+        $this->assertClassOwner($request, $classId);
+
+        $resp = $this->supabase->service()
+            ->withHeaders(['Prefer' => 'return=minimal'])
+            ->patch(
+                '/rest/v1/class_members?class_id=eq.'.$classId.'&user_id=eq.'.$userId,
+                ['status' => 'rejected']
+            );
+        if (! $resp->successful()) {
+            // Fallback: delete row
+            $this->supabase->service()->delete(
+                '/rest/v1/class_members?class_id=eq.'.$classId.'&user_id=eq.'.$userId
+            );
+        }
+
+        return response()->json(['ok' => true, 'status' => 'rejected']);
     }
 
     public function storeClass(Request $request)
@@ -173,6 +262,7 @@ class TeacherDataController extends Controller
         if (! $existing || ($existing[0]['teacher_id'] ?? '') !== $uid) {
             return response()->json(['message' => 'Forbidden or not found.'], 403);
         }
+        $this->deleteNotificationsForClass($id);
         $this->db->delete('classes', 'id', $id);
 
         return response()->json(['ok' => true]);
@@ -230,6 +320,14 @@ class TeacherDataController extends Controller
             null,
         );
 
+        $this->notifyClassStudents(
+            $classId,
+            'announcement_posted',
+            'New announcement',
+            $this->excerpt($data['body'], 120),
+            null,
+        );
+
         return response()->json([
             'id' => $row['id'],
             'body' => $row['body'] ?? '',
@@ -270,6 +368,8 @@ class TeacherDataController extends Controller
     {
         $this->assertClassOwner($request, $classId);
         $this->db->delete('announcements', 'id', $id);
+        // Remove related teacher/student notification cards for this class stream post
+        $this->deleteNotificationsByClassAndType($classId, 'announcement_posted');
 
         return response()->json(['ok' => true]);
     }
@@ -410,6 +510,14 @@ class TeacherDataController extends Controller
                 $rows[0]['class_id'],
                 $id,
             );
+
+            $this->notifyClassStudents(
+                $rows[0]['class_id'],
+                'activity_published',
+                'New activity',
+                $title,
+                $id,
+            );
         }
 
         return response()->json($mapped);
@@ -422,6 +530,7 @@ class TeacherDataController extends Controller
             return response()->json(['message' => 'Not found.'], 404);
         }
         $this->assertClassOwner($request, $rows[0]['class_id']);
+        $this->deleteNotificationsForActivity($id);
         $this->db->delete('class_activities', 'id', $id);
 
         return response()->json(['ok' => true]);
@@ -523,6 +632,19 @@ class TeacherDataController extends Controller
         ]);
 
         $row = $updated[0] ?? array_merge($subs[0], $patch);
+
+        $studentId = $row['student_id'] ?? $subs[0]['student_id'] ?? null;
+        $actTitle = $acts[0]['title'] ?? 'Activity';
+        if ($studentId) {
+            $this->notifyStudent(
+                (string) $studentId,
+                'activity_returned',
+                'Activity returned',
+                $actTitle.' — score: '.($row['score'] ?? $data['score']),
+                $acts[0]['class_id'] ?? null,
+                $activityId,
+            );
+        }
 
         return response()->json([
             'id' => $row['id'],
@@ -713,6 +835,62 @@ class TeacherDataController extends Controller
         return response()->json(['ok' => true, 'readAt' => $now]);
     }
 
+
+    protected function deleteNotificationsForClass(string $classId): void
+    {
+        try {
+            foreach (['teacher_notifications', 'student_notifications'] as $table) {
+                $rows = $this->db->get($table, ['class_id' => 'eq.'.$classId, 'select' => 'id']);
+                foreach ($rows as $r) {
+                    if (! empty($r['id'])) {
+                        $this->db->delete($table, 'id', $r['id']);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    protected function deleteNotificationsByClassAndType(string $classId, string $type): void
+    {
+        try {
+            foreach (['teacher_notifications', 'student_notifications'] as $table) {
+                $rows = $this->db->get($table, [
+                    'class_id' => 'eq.'.$classId,
+                    'type' => 'eq.'.$type,
+                    'select' => 'id',
+                ]);
+                foreach ($rows as $r) {
+                    if (! empty($r['id'])) {
+                        $this->db->delete($table, 'id', $r['id']);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    protected function deleteNotificationsForActivity(string $activityId): void
+    {
+        try {
+            foreach (['teacher_notifications', 'student_notifications'] as $table) {
+                $rows = $this->db->get($table, [
+                    'activity_id' => 'eq.'.$activityId,
+                    'select' => 'id',
+                ]);
+                foreach ($rows as $r) {
+                    if (! empty($r['id'])) {
+                        $this->db->delete($table, 'id', $r['id']);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
     protected function notifyTeacher(
         string $teacherId,
         string $type,
@@ -736,7 +914,73 @@ class TeacherDataController extends Controller
         }
     }
 
-    protected function classLabel(string $classId): string
+    
+    protected function notifyStudent(
+        string $userId,
+        string $type,
+        string $title,
+        string $body,
+        ?string $classId,
+        ?string $activityId,
+    ): void {
+        try {
+            $this->db->insert('student_notifications', array_filter([
+                'user_id' => $userId,
+                'type' => $type,
+                'title' => $title,
+                'body' => $body,
+                'class_id' => $classId,
+                'activity_id' => $activityId,
+            ], fn ($v) => $v !== null && $v !== ''));
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        try {
+            $this->fcm->sendToUser($userId, $title, $body, [
+                'type' => $type,
+                'classId' => $classId ?? '',
+                'activityId' => $activityId ?? '',
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /** Notify every student member of a class (not the teacher). */
+    protected function notifyClassStudents(
+        string $classId,
+        string $type,
+        string $title,
+        string $body,
+        ?string $activityId,
+    ): void {
+        try {
+            $members = $this->db->get('class_members', [
+                'class_id' => 'eq.'.$classId,
+                'select' => 'user_id,role,status',
+            ]);
+            foreach ($members as $m) {
+                $role = strtolower((string) ($m['role'] ?? 'student'));
+                if ($role === 'co_teacher' || $role === 'teacher') {
+                    continue;
+                }
+                $st = strtolower((string) ($m['status'] ?? 'approved'));
+                if ($st !== '' && $st !== 'approved') {
+                    continue;
+                }
+                $uid = $m['user_id'] ?? null;
+                if (! $uid) {
+                    continue;
+                }
+                $this->notifyStudent((string) $uid, $type, $title, $body, $classId, $activityId);
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+protected function classLabel(string $classId): string
     {
         $rows = $this->db->get('classes', [
             'id' => 'eq.'.$classId,

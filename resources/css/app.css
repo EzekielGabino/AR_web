@@ -1,44 +1,53 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Scan Blade/JS so utilities are generated (Tailwind v4) */
+@source "../../resources/views/**/*.blade.php";
+@source "../../resources/js/**/*.{js,ts}";
+
+/* Brand tokens used by @apply / utility classes */
+@theme {
+  --color-primary: #1b2cc1;
+  --color-primary-dark: #091540;
+  --color-primary-light: #7692ff;
+  --color-cardDark: #e8f1fa;
+  --color-borderDark: #c5d4e8;
+  --color-textMuted: #3d5a73;
+}
 
 @layer components {
+  .display-large {
+    @apply text-[32px] font-bold leading-[1.1] tracking-[-0.5px] text-primary-dark;
+  }
 
-    /* Typography Styles (Defaulting to readable dark text) */
-    .display-large {
-        @apply text-[32px] font-bold leading-[1.1] tracking-[-0.5px] text-primary-dark;
-    }
+  .title-large {
+    @apply text-[20px] font-semibold leading-[1.2] text-primary-dark;
+  }
 
-    .title-large {
-        @apply text-[20px] font-semibold leading-[1.2] text-primary-dark;
-    }
+  .title-medium {
+    @apply text-[16px] font-semibold text-primary-dark;
+  }
 
-    .title-medium {
-        @apply text-[16px] font-semibold text-primary-dark;
-    }
+  .stat-number {
+    @apply text-[28px] font-extrabold text-primary-dark;
+  }
 
-    .stat-number {
-        @apply text-[28px] font-extrabold text-primary-dark;
-    }
+  .body-medium {
+    @apply text-[13px] font-normal text-primary-dark;
+  }
 
-    .body-medium {
-        @apply text-[13px] font-normal text-primary-dark;
-    }
+  .body-small {
+    @apply text-[11px] font-medium text-textMuted;
+  }
 
-    .body-small {
-        @apply text-[11px] font-medium text-textMuted;
-    }
+  .label-large {
+    @apply text-[14px] font-semibold text-primary-dark;
+  }
 
-    .label-large {
-        @apply text-[14px] font-semibold text-primary-dark;
-    }
+  .btn-primary {
+    @apply flex items-center justify-center w-full h-[52px] bg-primary text-white text-[15px] font-bold rounded-[14px] shadow-md transition-transform active:scale-[0.98] hover:opacity-90 cursor-pointer;
+  }
 
-    /* Buttons */
-    .btn-primary {
-        @apply flex items-center justify-center w-full h-[52px] bg-primary text-white text-[15px] font-bold rounded-[14px] shadow-md transition-transform active:scale-[0.98] hover:opacity-90 cursor-pointer;
-    }
-
-    .btn-secondary {
-        @apply flex items-center justify-center w-full h-[52px] bg-cardDark text-primary-dark text-[15px] font-bold rounded-[14px] border border-borderDark transition-transform active:scale-[0.98] hover:bg-gray-200 cursor-pointer;
-    }
+  .btn-secondary {
+    @apply flex items-center justify-center w-full h-[52px] bg-cardDark text-primary-dark text-[15px] font-bold rounded-[14px] border border-borderDark transition-transform active:scale-[0.98] hover:bg-gray-200 cursor-pointer;
+  }
 }
