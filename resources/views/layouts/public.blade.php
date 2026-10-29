@@ -5,6 +5,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- OAuth: Supabase often returns tokens on Site URL (/#access_token=). Forward immediately. --}}
+    <script>
+    (function () {
+        try {
+            var h = window.location.hash || '';
+            var s = window.location.search || '';
+            var path = window.location.pathname || '/';
+            if (path.indexOf('/auth/supabase/callback') === 0) return;
+            if (h.indexOf('access_token=') !== -1 || h.indexOf('refresh_token=') !== -1 || h.indexOf('error=') !== -1) {
+                window.location.replace(window.location.origin + '/auth/supabase/callback' + h);
+                return;
+            }
+            if (s.indexOf('code=') !== -1) {
+                window.location.replace(window.location.origin + '/auth/supabase/callback' + s + h);
+            }
+        } catch (e) {}
+    })();
+    </script>
+
     <title>@yield('title', 'SciLens AR — Teacher Portal')</title>
 
     <script src="https://cdn.tailwindcss.com"></script>

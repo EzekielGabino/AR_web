@@ -11,7 +11,8 @@ use App\Http\Controllers\ClassController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SketchfabController;
 use App\Http\Controllers\Teacher\TeacherDataController;
-use Kreait\Firebase\Contract\Auth;
+use App\Http\Middleware\EnsureFirebaseSessionIsValid;
+use App\Http\Middleware\RedirectIfFirebaseAuthenticated;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,7 +33,7 @@ use Kreait\Firebase\Contract\Auth;
 Route::get('/', fn () => view('public.home'))->name('welcome');
 
 // Login is on the home page (#login). Keep named route for redirects.
-Route::middleware('guest.firebase')->group(function () {
+Route::middleware([RedirectIfFirebaseAuthenticated::class])->group(function () {
     Route::get('/login', function () {
         return redirect()->to(route('welcome') . '#login');
     })->name('login');
@@ -58,7 +59,7 @@ Route::post('/auth/set-password/skip', [SupabaseAuthController::class, 'skipPass
 // ---------------------------------------------------------------------
 // Authenticated teacher area
 // ---------------------------------------------------------------------
-Route::middleware('auth.firebase')->group(function () {
+Route::middleware([EnsureFirebaseSessionIsValid::class])->group(function () {
 
     Route::get('/dashboard', fn () => view('teacher.dashboard'))->name('dashboard');
 
@@ -136,14 +137,3 @@ Route::middleware('auth.firebase')->group(function () {
     Route::get('/equipment', fn () => view('dash-component.equipment-content.index'))->name('equipment.index');
 });
 
-// ---------------------------------------------------------------------
-// Diagnostics (safe to remove before the defense)
-// ---------------------------------------------------------------------
-Route::get('/firebase-test', function (Auth $auth) {
-    try {
-        $auth->listUsers(1);
-        return response()->json(['status' => 'connected']);
-    } catch (\Throwable $e) {
-        return response()->json(['status' => 'failed', 'error' => $e->getMessage()], 500);
-    }
-})->name('firebase.test');

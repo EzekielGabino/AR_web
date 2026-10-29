@@ -66,10 +66,12 @@
 
                 const res = await fetch(sessionUrl, {
                     method: 'POST',
+                    credentials: 'same-origin',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'X-Requested-With': 'XMLHttpRequest',
                     },
                     body: JSON.stringify({ access_token: accessToken }),
                 });

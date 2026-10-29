@@ -55,6 +55,19 @@
 
 @push('scripts')
 <script>
+(function () {
+    var hash = window.location.hash || '';
+    if (hash.indexOf('access_token=') !== -1 || hash.indexOf('error=') !== -1) {
+        window.location.replace(@json(url('/auth/supabase/callback')) + hash);
+        return;
+    }
+    var qs = window.location.search || '';
+    if (qs.indexOf('code=') !== -1) {
+        window.location.replace(@json(url('/auth/supabase/callback')) + qs);
+    }
+})();
+</script>
+<script>
     window.scrollToLogin = function (e) {
         if (e) e.preventDefault();
         var isLg = window.matchMedia('(min-width: 1024px)').matches;
@@ -66,7 +79,7 @@
 <script>
     window.__supabaseUrl = @json(rtrim((string) config('supabase.url'), '/'));
     window.__supabaseAnonKey = @json((string) config('supabase.anon_key'));
-    window.__supabaseCallbackUrl = @json(route('auth.supabase.callback'));
+    window.__supabaseCallbackUrl = (window.location.origin || @json(rtrim((string) config('app.url'), '/'))) + '/auth/supabase/callback';
 </script>
 <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -95,10 +108,12 @@
                     btn.disabled = true;
                     if (label) label.textContent = 'Signing in…';
                     const supabase = createClient(url, anon);
+                    console.log('OAuth redirectTo', redirectTo);
                     const { data, error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
-                            redirectTo,
+                            redirectTo: redirectTo,
+                            skipBrowserRedirect: false,
                             queryParams: { prompt: 'select_account' },
                         },
                     });
