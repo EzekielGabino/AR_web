@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libzip-dev \
     libicu-dev \
     libonig-dev \
+    $PHPIZE_DEPS \
     && docker-php-ext-install \
     pdo_pgsql \
     mbstring \
@@ -29,6 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     intl \
     zip \
     opcache \
+    && pecl install grpc-1.85.0 \
+    && docker-php-ext-enable grpc \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
