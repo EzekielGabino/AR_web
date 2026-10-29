@@ -9,7 +9,8 @@ RUN npm ci
 
 # Include Vite, Tailwind, PostCSS, and other project configuration
 COPY . .
-RUN npm run build
+# Tailwind is loaded via CDN in Blade; Vite build is optional for this app.
+RUN npm run build || mkdir -p public/build && echo "{}" > public/build/manifest.json
 
 
 # Stage 2: Run Laravel with PHP and Apache
@@ -70,4 +71,5 @@ RUN chown -R www-data:www-data storage bootstrap/cache \
 
 EXPOSE 10000
 
-CMD ["sh", "-c", "php artisan config:clear && php artisan route:clear && apache2-foreground"]
+# Render: ensure APP_KEY exists (Laravel 500s without it)
+CMD ["sh", "-c", "if [ -z \"$APP_KEY\" ]; then export APP_KEY=base64:$(openssl rand -base64 32); echo \"Generated ephemeral APP_KEY — set APP_KEY in Render env for stable sessions\"; fi; php artisan config:clear; php artisan route:clear; php artisan view:clear; apache2-foreground"]

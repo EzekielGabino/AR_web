@@ -20,6 +20,11 @@
 /storage/pail
 /vendor
 /app/private
+/app/private/firebase/
+/storage/app/private/firebase/
+*.json
+# or specifically:
+service-account.json
 Homestead.json
 Homestead.yaml
 Thumbs.db
