@@ -36,12 +36,14 @@
                     </div>
                     <div class="flex shrink-0 gap-2">
                         <button type="button" @click="rejectStudent(s)"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50">
+                            :disabled="memberActionUid === s.uid"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
                             Decline
                         </button>
                         <button type="button" @click="approveStudent(s)"
-                            class="rounded-xl bg-[#1B2CC1] px-3 py-2 text-[11px] font-bold text-white hover:bg-[#1625a8]">
-                            Approve
+                            :disabled="memberActionUid === s.uid"
+                            class="rounded-xl bg-[#1B2CC1] px-3 py-2 text-[11px] font-bold text-white hover:bg-[#1625a8] disabled:opacity-50">
+                            <span x-text="memberActionUid === s.uid ? 'Working…' : 'Approve'"></span>
                         </button>
                     </div>
                 </div>

@@ -26,6 +26,11 @@
             useConfirm: null,
             useBusy: false,
             useError: '',
+            pendingPollTimer: null,
+            lastPendingCount: 0,
+            joinToast: '',
+            joinToastTimer: null,
+            memberActionUid: null,
             deleteConfirm: null,
             deleteBusy: false,
             deleteError: '',
@@ -127,7 +132,49 @@
             async init() {
                 await this.waitModule();
                 await this.refreshAll();
+                this.lastPendingCount = this.pendingStudents().length;
+                this.startPendingPoll();
                 this.$nextTick(() => this.renderQr());
+            },
+            startPendingPoll() {
+                this.stopPendingPoll();
+                // Poll join requests so the Students tab updates without a full page refresh
+                this.pendingPollTimer = setInterval(() => {
+                    this.pollPendingMembers();
+                }, 5000);
+            },
+            stopPendingPoll() {
+                if (this.pendingPollTimer) {
+                    clearInterval(this.pendingPollTimer);
+                    this.pendingPollTimer = null;
+                }
+            },
+            async pollPendingMembers() {
+                if (!this.classId || !window.TeacherClassroom || document.hidden) return;
+                try {
+                    const data = await window.TeacherClassroom.loadClass(this.classId);
+                    const prev = this.lastPendingCount;
+                    this.classData = data;
+                    const next = this.pendingStudents().length;
+                    if (next > prev) {
+                        const added = next - prev;
+                        this.showJoinToast(
+                            added === 1
+                                ? 'New join request — open Students to approve.'
+                                : (added + ' new join requests — open Students to approve.')
+                        );
+                        // Optional: soft highlight by switching is not forced; teacher stays on current tab
+                    }
+                    this.lastPendingCount = next;
+                } catch (e) {
+                    // Silent — avoid spamming errors while polling
+                    console.warn('pending poll', e);
+                }
+            },
+            showJoinToast(msg) {
+                this.joinToast = msg;
+                if (this.joinToastTimer) clearTimeout(this.joinToastTimer);
+                this.joinToastTimer = setTimeout(() => { this.joinToast = ''; }, 6000);
             },
             waitModule() {
                 if (window.TeacherClassroom) return Promise.resolve();
@@ -945,22 +992,30 @@
                 this.classData = await window.TeacherClassroom.loadClass(this.classId);
             },
             async approveStudent(s) {
-                if (!s?.uid) return;
+                if (!s?.uid || this.memberActionUid) return;
+                this.memberActionUid = s.uid;
                 try {
                     await window.TeacherClassroom.approveMember(this.classId, s.uid);
                     await this.refreshClass();
+                    this.lastPendingCount = this.pendingStudents().length;
                 } catch (e) {
                     alert(e.message || 'Could not approve student.');
+                } finally {
+                    this.memberActionUid = null;
                 }
             },
             async rejectStudent(s) {
-                if (!s?.uid) return;
+                if (!s?.uid || this.memberActionUid) return;
                 if (!confirm('Decline this join request?')) return;
+                this.memberActionUid = s.uid;
                 try {
                     await window.TeacherClassroom.rejectMember(this.classId, s.uid);
                     await this.refreshClass();
+                    this.lastPendingCount = this.pendingStudents().length;
                 } catch (e) {
                     alert(e.message || 'Could not decline request.');
+                } finally {
+                    this.memberActionUid = null;
                 }
             },
             studentLabel(s) {
@@ -1048,11 +1103,15 @@
                         ]" :key="t.id">
                                 <button type="button"
                                     @click="selectTab(t.id)"
-                                    class="cursor-pointer flex shrink-0 items-center rounded-2xl px-4 py-2.5 text-left text-xs font-extrabold transition-all sm:py-3 lg:w-full"
+                                    class="cursor-pointer flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-left text-xs font-extrabold transition-all sm:py-3 lg:w-full"
                                     :class="tab === t.id
                                         ? 'bg-[#1B2CC1] text-white shadow-md shadow-[#1B2CC1]/30 ring-1 ring-[#7692FF]/50'
                                         : 'bg-[#ABD2FA]/15 text-[#091540]/70 hover:bg-[#ABD2FA]/25 hover:text-[#091540] lg:bg-transparent'">
                                     <span x-text="t.label"></span>
+                                    <span x-show="t.id === 'people' && pendingStudents().length > 0"
+                                        class="ml-auto inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-black"
+                                        :class="tab === 'people' ? 'bg-white text-[#1B2CC1]' : 'bg-amber-500 text-white'"
+                                        x-text="pendingStudents().length"></span>
                                 </button>
                             </template>
                         </div>
@@ -1069,6 +1128,18 @@
             </main>
         </div>
     </template>
+
+    {{-- Join-request toast (polling) --}}
+    <div x-show="joinToast" x-cloak x-transition
+        class="fixed bottom-6 left-1/2 z-[80] flex max-w-md -translate-x-1/2 items-center gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-3 shadow-xl shadow-amber-500/20">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-sm">🔔</span>
+        <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-[#091540]" x-text="joinToast"></p>
+            <button type="button" @click="selectTab('people'); joinToast = ''"
+                class="mt-1 text-[11px] font-extrabold text-[#1B2CC1] hover:underline">Open Students</button>
+        </div>
+        <button type="button" @click="joinToast = ''" class="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
+    </div>
 
     @include('teacher.classroom.template-editor')
     @include('teacher.classroom.regular-editor')
