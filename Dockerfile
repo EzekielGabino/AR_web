@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     intl \
     zip \
     opcache \
-    && pecl install grpc-1.85.0 \
+    && pecl install grpc-1.85.0 --configureoptions="--enable-grpc" \
     && docker-php-ext-enable grpc \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
