@@ -2,45 +2,80 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Supabase\SupabaseClient;
 use Illuminate\Http\Request;
-use Kreait\Firebase\Contract\Auth as FirebaseAuth;
+use Illuminate\Support\Facades\Http;
+use Throwable;
 
+/**
+ * Teacher profile actions (Supabase Auth — no Firebase).
+ */
 class ProfileController extends Controller
 {
-    protected $auth;
-
-    public function __construct(FirebaseAuth $auth)
-    {
-        $this->auth = $auth;
-    }
-
-    // Attaches (or updates) a password credential on the teacher's
-    // EXISTING Firebase Auth account — this is account linking, not
-    // registration. It targets the uid already sitting in the session
-    // (set at Google sign-in), so it can never create a second account
-    // for the same teacher. After this, they can sign in via either
-    // Google or email/password and land on the exact same uid/profile.
     public function updatePassword(Request $request)
     {
-        $uid = session('firebase_uid');
+        $uid = $request->session()->get('auth_uid')
+            ?: $request->session()->get('firebase_uid');
 
-        if (!$uid) {
-            return response()->json(['message' => 'You must be signed in to do this.'], 401);
+        if (! $uid) {
+            return response()->json([
+                'message' => 'You must be signed in to change your password.',
+            ], 401);
         }
 
-        $request->validate([
-            'password' => 'required|string|min:6',
-            'password_confirmation' => 'required|string|same:password',
+        $validated = $request->validate([
+            'password' => 'required|string|min:6|confirmed',
         ]);
 
         try {
-            $this->auth->updateUser($uid, [
-                'password' => $request->password,
-            ]);
+            $url = SupabaseClient::normalizeProjectUrl((string) config('supabase.url'));
+            $serviceKey = (string) config('supabase.service_role_key');
 
-            return response()->json(['message' => 'Password set successfully. You can now sign in with email too.']);
-        } catch (\Throwable $e) {
-            return response()->json(['message' => 'Failed to set password: ' . $e->getMessage()], 500);
+            if ($url === '' || $serviceKey === '') {
+                return response()->json([
+                    'message' => 'Password service is not configured (Supabase keys missing).',
+                ], 503);
+            }
+
+            $response = Http::baseUrl($url)
+                ->withHeaders([
+                    'apikey' => $serviceKey,
+                    'Authorization' => 'Bearer '.$serviceKey,
+                    'Content-Type' => 'application/json',
+                ])
+                ->put('/auth/v1/admin/users/'.$uid, [
+                    'password' => $validated['password'],
+                ]);
+
+            if (! $response->successful()) {
+                $msg = $response->json('msg')
+                    ?? $response->json('message')
+                    ?? ('Could not update password (HTTP '.$response->status().').');
+
+                return response()->json([
+                    'message' => is_string($msg) ? $msg : 'Could not update password.',
+                ], 422);
+            }
+
+            try {
+                app(SupabaseClient::class)->service()
+                    ->patch('/rest/v1/profiles?id=eq.'.$uid, [
+                        'has_password_set' => true,
+                        'updated_at' => now()->toIso8601String(),
+                    ]);
+            } catch (Throwable $e) {
+                // non-fatal
+            }
+
+            return response()->json([
+                'message' => 'Password updated. You can sign in with email and this password.',
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'message' => $e->getMessage() ?: 'Could not update password.',
+            ], 500);
         }
     }
 }
