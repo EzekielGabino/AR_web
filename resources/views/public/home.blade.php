@@ -95,20 +95,27 @@
                 const root = btn.closest('section') || document;
                 const err = root.querySelector('.google-signin-error');
                 const label = btn.querySelector('.google-signin-label');
+                const showErr = (msg) => {
+                    if (err) { err.textContent = msg; err.classList.remove('hidden'); }
+                };
                 if (err) { err.classList.add('hidden'); err.textContent = ''; }
+
+                if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+                    showErr('No internet connection. Check your network and try again.');
+                    return;
+                }
                 if (!url || !anon) {
-                    if (err) { err.textContent = 'Supabase is not configured (URL/anon key missing).'; err.classList.remove('hidden'); }
+                    showErr('Supabase is not configured (URL/anon key missing).');
                     return;
                 }
                 if (!redirectTo) {
-                    if (err) { err.textContent = 'Missing OAuth callback URL.'; err.classList.remove('hidden'); }
+                    showErr('Missing OAuth callback URL.');
                     return;
                 }
                 try {
                     btn.disabled = true;
                     if (label) label.textContent = 'Signing in…';
                     const supabase = createClient(url, anon);
-                    console.log('OAuth redirectTo', redirectTo);
                     const { data, error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
@@ -118,17 +125,20 @@
                         },
                     });
                     if (error) throw error;
-                    // If no redirect happened (blocked), show URL
                     if (data && data.url) {
                         window.location.href = data.url;
+                        return;
                     }
                 } catch (ex) {
                     console.error(ex);
                     btn.disabled = false;
                     if (label) label.textContent = 'Continue with Google';
-                    if (err) {
-                        err.textContent = (ex && ex.message) ? ex.message : 'Google sign-in failed. Enable Google provider in Supabase and add redirect URL.';
-                        err.classList.remove('hidden');
+                    const msg = (ex && ex.message) ? String(ex.message) : '';
+                    const lower = msg.toLowerCase();
+                    if (!navigator.onLine || lower.includes('failed to fetch') || lower.includes('network') || lower.includes('load failed') || lower.includes('offline')) {
+                        showErr('No internet connection. Check your network and try again.');
+                    } else {
+                        showErr(msg || 'Google sign-in failed. Enable Google provider in Supabase and add redirect URL.');
                     }
                 }
             });

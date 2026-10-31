@@ -63,6 +63,9 @@
                 if (!accessToken) {
                     throw new Error('No session returned from Google. Try again.');
                 }
+                if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+                    throw new Error('No internet connection. Check your network and try again.');
+                }
 
                 const res = await fetch(sessionUrl, {
                     method: 'POST',
@@ -85,7 +88,12 @@
                 window.location.href = payload.redirect;
             } catch (e) {
                 console.error(e);
-                fail(e.message || 'Sign-in failed.');
+                var m = (e && e.message) ? String(e.message) : 'Sign-in failed.';
+                var low = m.toLowerCase();
+                if (!navigator.onLine || low.indexOf('failed to fetch') !== -1 || low.indexOf('network') !== -1) {
+                    m = 'No internet connection. Check your network and try again.';
+                }
+                fail(m);
             }
         }
     </script>

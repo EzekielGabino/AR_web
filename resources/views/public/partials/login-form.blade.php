@@ -1,6 +1,35 @@
 {{-- public/partials/login-form.blade.php --}}
 <section class="relative flex w-full flex-col justify-center overflow-hidden px-4 py-8 text-white sm:px-8 sm:py-12 lg:px-16"
-    x-data="{ showPassword: false, mode: @js(session('auth_mode', 'login')) }">
+    x-data="{
+        showPassword: false,
+        mode: @js(session('auth_mode', 'login')),
+        clientError: '',
+        submitting: false,
+        online: typeof navigator !== 'undefined' ? navigator.onLine : true,
+        init() {
+            window.addEventListener('online', () => { this.online = true; if (this.clientError.indexOf('internet') !== -1 || this.clientError.indexOf('network') !== -1) this.clientError = ''; });
+            window.addEventListener('offline', () => { this.online = false; });
+        },
+        networkMessage() {
+            return 'No internet connection. Check your network and try again.';
+        },
+        assertOnline() {
+            if (!navigator.onLine) {
+                this.clientError = this.networkMessage();
+                return false;
+            }
+            this.clientError = '';
+            return true;
+        },
+        async submitAuth(e) {
+            if (!this.assertOnline()) {
+                e.preventDefault();
+                return;
+            }
+            this.submitting = true;
+            // Allow normal form POST to continue
+        }
+    }">
 
     <div class="pointer-events-none absolute -top-20 -left-20 h-64 w-64 rounded-full bg-[#1B2CC1]/50 blur-3xl"></div>
     <div class="pointer-events-none absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-[#7692FF]/30 blur-3xl"></div>
@@ -13,11 +42,21 @@
             <span class="text-xl font-black tracking-tight text-white">SciLens AR</span>
         </div>
 
+        {{-- Offline banner --}}
+        <div x-show="!online" x-cloak
+            class="mb-4 rounded-2xl border border-amber-400/50 bg-amber-500/20 p-3 text-center text-xs font-bold text-amber-100">
+            You are offline. Sign in and sign up need an internet connection.
+        </div>
+
         @if ($errors->any())
         <div class="mb-6 rounded-2xl border border-rose-500/40 bg-rose-500/20 p-4 text-xs font-bold leading-relaxed text-rose-200 backdrop-blur-md">
             {{ $errors->first() }}
         </div>
         @endif
+
+        <div x-show="clientError" x-cloak
+            class="mb-6 rounded-2xl border border-rose-500/40 bg-rose-500/20 p-4 text-xs font-bold leading-relaxed text-rose-200 backdrop-blur-md"
+            x-text="clientError"></div>
 
         <div class="mb-6 text-center">
             <h3 class="text-2xl font-extrabold tracking-tight text-white"
@@ -26,21 +65,21 @@
         </div>
 
         <div class="mb-5 flex rounded-2xl border border-[#7692FF]/30 bg-white/5 p-1">
-            <button type="button" @click="mode = 'login'"
+            <button type="button" @click="mode = 'login'; clientError = ''"
                 class="flex-1 rounded-xl py-2.5 text-xs font-bold transition-all"
                 :class="mode === 'login' ? 'bg-[#1B2CC1] text-white shadow' : 'text-[#ABD2FA]/80 hover:text-white'">
                 Sign in
             </button>
-            <button type="button" @click="mode = 'register'"
+            <button type="button" @click="mode = 'register'; clientError = ''"
                 class="flex-1 rounded-xl py-2.5 text-xs font-bold transition-all"
                 :class="mode === 'register' ? 'bg-[#1B2CC1] text-white shadow' : 'text-[#ABD2FA]/80 hover:text-white'">
                 Sign up
             </button>
         </div>
 
-        {{-- Single form: action switches so Create account cannot hit login.post --}}
         <form method="POST" class="space-y-4"
-            :action="mode === 'login' ? @js(route('login.post')) : @js(route('register.post'))">
+            :action="mode === 'login' ? @js(route('login.post')) : @js(route('register.post'))"
+            @submit="submitAuth($event)">
             @csrf
             <input type="hidden" name="auth_mode" :value="mode">
 
@@ -65,8 +104,9 @@
             </div>
 
             <button type="submit"
-                class="mt-2 w-full cursor-pointer rounded-2xl bg-[#1B2CC1] py-4 text-xs font-bold text-white shadow-lg shadow-[#1B2CC1]/40 transition-all duration-200 hover:bg-[#7692FF] hover:text-[#091540] hover:shadow-xl hover:shadow-[#7692FF]/30 active:scale-[0.98]"
-                x-text="mode === 'login' ? 'Sign in' : 'Create account'">
+                :disabled="submitting || !online"
+                class="mt-2 w-full cursor-pointer rounded-2xl bg-[#1B2CC1] py-4 text-xs font-bold text-white shadow-lg shadow-[#1B2CC1]/40 transition-all duration-200 hover:bg-[#7692FF] hover:text-[#091540] hover:shadow-xl hover:shadow-[#7692FF]/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                x-text="submitting ? (mode === 'login' ? 'Signing in…' : 'Creating account…') : (mode === 'login' ? 'Sign in' : 'Create account')">
             </button>
         </form>
 
@@ -77,7 +117,8 @@
         </div>
 
         <button type="button"
-            class="google-signin-btn flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-3 rounded-2xl border-[1.5px] border-[#7692FF]/30 bg-white/5 px-4 py-4 text-xs font-bold text-white shadow-sm transition-all hover:border-[#7692FF] hover:bg-white/10 active:scale-[0.98]"
+            class="google-signin-btn flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-3 rounded-2xl border-[1.5px] border-[#7692FF]/30 bg-white/5 px-4 py-4 text-xs font-bold text-white shadow-sm transition-all hover:border-[#7692FF] hover:bg-white/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            :disabled="!online"
             aria-label="Sign in with Google">
             <svg class="h-5 w-5 shrink-0" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
