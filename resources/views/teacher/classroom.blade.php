@@ -377,11 +377,29 @@
                     };
                     // New blank: create on first Save only (Cancel leaves nothing in the DB)
                     if (!this.tplActive.id) {
+                        const pendingFiles = (this.tplForm.attachments || [])
+                            .filter((a) => a && a._localFile)
+                            .map((a) => a._localFile);
+                        // Create without local File blobs in JSON
                         const created = await window.TeacherClassroom.assignLabFromTemplate(
                             this.classId,
-                            { ...form, ...patch },
+                            { ...form, ...patch, attachments: [] },
                             null
                         );
+                        let uploaded = [];
+                        for (const file of pendingFiles) {
+                            try {
+                                const meta = await window.TeacherClassroom.uploadActivityAttachment(created.id, file);
+                                uploaded.push(meta);
+                            } catch (upErr) {
+                                console.error(upErr);
+                                this.tplError = (this.tplError ? this.tplError + ' ' : '') + (upErr.message || 'Some files failed to upload.');
+                            }
+                        }
+                        if (uploaded.length) {
+                            await window.TeacherClassroom.updateClassActivity(created.id, { attachments: uploaded });
+                            created.attachments = uploaded;
+                        }
                         this.activities = [created, ...this.activities];
                         this.closeTplModal();
                         return;
@@ -568,41 +586,41 @@
                     this.streamUploading = false;
                 }
             },
-            /** Persist a draft shell so attachments can upload before full Save (new blank labs). */
-            async ensureTplDraft() {
-                if (this.tplActive?.id) return this.tplActive.id;
-                if (this.tplModal !== 'edit-lab' || !this.tplActive) {
-                    throw new Error('Open a lab activity editor first.');
-                }
-                const form = this.normalizeTplForm();
-                const title = (form.title || '').trim() || 'Untitled lab';
-                const created = await window.TeacherClassroom.assignLabFromTemplate(
-                    this.classId,
-                    {
-                        ...form,
-                        title,
-                        published: false,
-                        status: 'draft',
-                        attachments: form.attachments || [],
-                    },
-                    null
-                );
-                this.tplActive = { ...this.tplActive, ...created, id: created.id };
-                this.activities = [created, ...this.activities.filter((a) => a.id !== created.id)];
-                return created.id;
-            },
+            /**
+             * Attachments for labs that already exist upload immediately.
+             * New (unsaved) labs keep File objects locally until Save content.
+             */
             async onTplFileSelected(event) {
                 const file = event.target?.files?.[0];
                 event.target.value = '';
                 if (!file || this.tplModal !== 'edit-lab' || !this.tplActive) return;
                 this.tplError = '';
+
+                // Unsaved new lab: queue locally — do not create a draft yet
+                if (!this.tplActive.id) {
+                    const maxBytes = 15 * 1024 * 1024;
+                    if (file.size > maxBytes) {
+                        this.tplError = 'File is too large (max 15 MB).';
+                        return;
+                    }
+                    const local = {
+                        name: file.name,
+                        size: file.size,
+                        mimeType: file.type || 'application/octet-stream',
+                        storagePath: null,
+                        _localFile: file,
+                        _pending: true,
+                    };
+                    this.tplForm.attachments = [...(this.tplForm.attachments || []), local];
+                    return;
+                }
+
                 this.tplUploading = true;
                 try {
-                    const activityId = await this.ensureTplDraft();
-                    const meta = await window.TeacherClassroom.uploadActivityAttachment(activityId, file);
+                    const meta = await window.TeacherClassroom.uploadActivityAttachment(this.tplActive.id, file);
                     this.tplForm.attachments = [...(this.tplForm.attachments || []), meta];
                     this.activities = this.activities.map((a) =>
-                        a.id === activityId ? { ...a, attachments: this.tplForm.attachments } : a
+                        a.id === this.tplActive.id ? { ...a, attachments: this.tplForm.attachments } : a
                     );
                 } catch (e) {
                     console.error(e);
@@ -615,8 +633,13 @@
                 const list = this.tplForm.attachments || [];
                 const item = list[index];
                 if (!item || !this.tplActive) return;
-                if (!this.tplActive.id && item.storagePath) {
-                    this.tplError = 'Save the lab once before removing cloud files.';
+                // Local pending file (not uploaded yet)
+                if (item._pending || item._localFile) {
+                    this.tplForm.attachments = list.filter((_, i) => i !== index);
+                    return;
+                }
+                if (!this.tplActive.id) {
+                    this.tplForm.attachments = list.filter((_, i) => i !== index);
                     return;
                 }
                 try {

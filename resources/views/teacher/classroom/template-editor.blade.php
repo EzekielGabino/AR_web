@@ -71,7 +71,7 @@
                                 </label>
                             </div>
                             <ul class="space-y-2" x-show="(tplForm.attachments || []).length">
-                                <template x-for="(file, fi) in (tplForm.attachments || [])" :key="file.storagePath || fi">
+                                <template x-for="(file, fi) in (tplForm.attachments || [])" :key="file.storagePath || file.name || fi">
                                     <li class="flex items-center justify-between gap-2 rounded-xl border border-[#ABD2FA]/60 bg-[#ABD2FA]/10 px-3.5 py-2.5">
                                         <a :href="file.url || file.downloadURL" target="_blank" rel="noopener"
                                             class="truncate text-xs font-bold text-[#1B2CC1] hover:underline"
@@ -80,7 +80,7 @@
                                     </li>
                                 </template>
                             </ul>
-                            <p class="text-xs text-[#091540]/60 font-medium" x-show="!(tplForm.attachments || []).length">No files yet. PDF, Word, or image (max 15 MB). New labs are saved as a draft automatically when you add a file.</p>
+                            <p class="text-xs text-[#091540]/60 font-medium" x-show="!(tplForm.attachments || []).length">No files yet. PDF, Word, or image (max 15 MB). On a new lab, files stay local until you click Save content.</p>
                         </div>
                     </div>
 
