@@ -125,7 +125,10 @@
             }
         },
         studentCount(c) {
-            return Array.isArray(c.students) ? c.students.length : 0;
+            if (c == null) return 0;
+            if (typeof c.student_count === 'number') return c.student_count;
+            if (Array.isArray(c.students)) return c.students.length;
+            return 0;
         },
         classroomUrl(id) {
             return @js(url('/classes')) + '/' + id;

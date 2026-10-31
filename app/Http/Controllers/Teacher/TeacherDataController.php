@@ -76,7 +76,48 @@ class TeacherDataController extends Controller
             'order' => 'created_at.desc',
         ]);
 
-        return response()->json(array_map([$this, 'mapClass'], $rows));
+        // Count approved students per class (dashboard cards)
+        $counts = [];
+        if ($rows) {
+            $ids = array_values(array_filter(array_map(fn ($r) => $r['id'] ?? null, $rows)));
+            if ($ids) {
+                // PostgREST: class_id=in.(uuid1,uuid2)
+                $in = 'in.('.implode(',', $ids).')';
+                try {
+                    $members = $this->db->get('class_members', [
+                        'class_id' => $in,
+                        'select' => 'class_id,role,status',
+                    ]);
+                    foreach ($members as $m) {
+                        $role = strtolower((string) ($m['role'] ?? 'student'));
+                        if (in_array($role, ['teacher', 'co_teacher'], true)) {
+                            continue;
+                        }
+                        $st = strtolower((string) ($m['status'] ?? 'approved'));
+                        if ($st !== '' && $st !== 'approved') {
+                            continue;
+                        }
+                        $cid = $m['class_id'] ?? null;
+                        if ($cid) {
+                            $counts[$cid] = ($counts[$cid] ?? 0) + 1;
+                        }
+                    }
+                } catch (Throwable $e) {
+                    report($e);
+                }
+            }
+        }
+
+        $mapped = [];
+        foreach ($rows as $r) {
+            $c = $this->mapClass($r);
+            $n = (int) ($counts[$r['id'] ?? ''] ?? 0);
+            $c['student_count'] = $n;
+            $c['students'] = array_fill(0, $n, true); // length used by older studentCount()
+            $mapped[] = $c;
+        }
+
+        return response()->json($mapped);
     }
 
     public function showClass(Request $request, string $id)
@@ -795,6 +836,7 @@ class TeacherDataController extends Controller
             'teacher_uid' => $r['teacher_id'] ?? null,
             'teacher_id' => $r['teacher_id'] ?? null,
             'students' => [],
+            'student_count' => 0,
             'created_at' => $r['created_at'] ?? null,
             'updated_at' => $r['updated_at'] ?? null,
         ];
