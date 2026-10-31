@@ -55,6 +55,13 @@ WORKDIR /var/www/html
 
 COPY . .
 
+# Fail the build if site logos are missing (avoids silent 404s on Render)
+RUN ls -la public && ls -la public/icons || true \
+    && test -f public/icons/logo.png \
+    && test -f public/logo.png \
+    && chmod 644 public/icons/logo.png public/logo.png \
+    || (echo "ERROR: logo PNG missing in image — check Git includes public/icons/logo.png" && exit 1)
+
 # Copy compiled Vite assets
 COPY --from=frontend /app/public/build ./public/build
 

@@ -49,7 +49,7 @@
     <div class="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div class="flex items-center gap-3">
             <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#7692FF]/40 bg-[#1B2CC1]/30 p-2 shadow-sm">
-                <img src="{{ asset('icons/logo.png') }}" alt="SciLens AR Logo" class="h-full w-full object-contain">
+                <img src="{{ asset('icons/logo.png') }}" onerror="this.onerror=null;this.src='{{ asset('logo.png') }}'" alt="SciLens AR Logo" class="h-full w-full object-contain">
             </div>
             <div>
                 <p class="text-sm font-black tracking-tight text-white">SciLens AR</p>

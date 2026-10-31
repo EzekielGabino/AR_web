@@ -1,7 +1,7 @@
 <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
     <a href="{{ route('welcome') }}#top" class="flex min-w-0 items-center gap-2 group">
         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#ABD2FA]/60 bg-[#ABD2FA]/20 p-1.5 shadow-xs transition-transform group-hover:scale-105">
-            <img src="{{ asset('icons/logo.png') }}" alt="SciLens AR Logo" class="h-full w-full object-contain">
+            <img src="{{ asset('icons/logo.png') }}" onerror="this.onerror=null;this.src='{{ asset('logo.png') }}'" alt="SciLens AR Logo" class="h-full w-full object-contain">
         </div>
         <span class="truncate text-sm font-black tracking-tight text-[#091540]">SciLens AR</span>
     </a>

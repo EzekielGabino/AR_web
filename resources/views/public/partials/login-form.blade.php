@@ -8,7 +8,7 @@
     <div class="relative z-10 mx-auto w-full max-w-md">
         <div class="mb-6 flex items-center justify-center gap-3 sm:mb-8">
             <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#7692FF]/40 bg-[#1B2CC1]/40 p-2 shadow-lg shadow-[#1B2CC1]/30">
-                <img src="{{ asset('icons/logo.png') }}" alt="SciLens AR Logo" class="h-full w-full object-contain">
+                <img src="{{ asset('icons/logo.png') }}" onerror="this.onerror=null;this.src='{{ asset('logo.png') }}'" alt="SciLens AR Logo" class="h-full w-full object-contain">
             </div>
             <span class="text-xl font-black tracking-tight text-white">SciLens AR</span>
         </div>
