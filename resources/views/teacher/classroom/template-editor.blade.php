@@ -80,7 +80,7 @@
                                     </li>
                                 </template>
                             </ul>
-                            <p class="text-xs text-[#091540]/60 font-medium" x-show="!(tplForm.attachments || []).length">No files yet. PDF, Word, or image (max 15 MB).</p>
+                            <p class="text-xs text-[#091540]/60 font-medium" x-show="!(tplForm.attachments || []).length">No files yet. PDF, Word, or image (max 15 MB). New labs are saved as a draft automatically when you add a file.</p>
                         </div>
                     </div>
 
@@ -120,6 +120,14 @@
 
                     {{-- Elements --}}
                     <div x-show="tplSection === 'elements'" class="space-y-4">
+                        <p class="rounded-xl border border-[#ABD2FA]/60 bg-[#ABD2FA]/15 px-3 py-2 text-[11px] font-medium leading-relaxed text-[#091540]/80">
+                            <span class="font-extrabold text-[#1B2CC1]">Volume rules:</span>
+                            Min volume 2–50.
+                            Max volume up to <span class="font-bold" x-text="elementVolumeCeiling()"></span>
+                            (1.5× largest apparatus max volume).
+                            Default volume stays between min and max. Negatives are not allowed.
+                        </p>
+
                         <p class="text-xs font-medium text-[#091540]/70">Substances used in this lab. Color uses a picker (stored as #RRGGBBAA).</p>
                         <template x-if="elementCategoryRules[tplForm.labCategory]">
                             <div class="rounded-2xl border px-4 py-3 text-xs"
@@ -174,15 +182,15 @@
                                         </div>
                                         <div>
                                             <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#1B2CC1]">Min volume</label>
-                                            <input type="number" x-model.number="e.minVol" class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
+                                            <input type="number" x-model.number="e.minVol" min="2" max="50" step="1" class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
                                         </div>
                                         <div>
                                             <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#1B2CC1]">Max volume</label>
-                                            <input type="number" x-model.number="e.maxVol" class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
+                                            <input type="number" x-model.number="e.maxVol" min="2" :max="elementVolumeCeiling()" step="1" class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
                                         </div>
                                         <div>
                                             <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#1B2CC1]">Default volume</label>
-                                            <input type="number" x-model.number="e.volume" class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
+                                            <input type="number" x-model.number="e.volume" min="0" :max="e.maxVol || elementVolumeCeiling()" step="1" class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
                                         </div>
                                         <div>
                                             <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#1B2CC1]">Molarity</label>

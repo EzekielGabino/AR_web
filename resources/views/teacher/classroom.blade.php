@@ -568,17 +568,41 @@
                     this.streamUploading = false;
                 }
             },
+            /** Persist a draft shell so attachments can upload before full Save (new blank labs). */
+            async ensureTplDraft() {
+                if (this.tplActive?.id) return this.tplActive.id;
+                if (this.tplModal !== 'edit-lab' || !this.tplActive) {
+                    throw new Error('Open a lab activity editor first.');
+                }
+                const form = this.normalizeTplForm();
+                const title = (form.title || '').trim() || 'Untitled lab';
+                const created = await window.TeacherClassroom.assignLabFromTemplate(
+                    this.classId,
+                    {
+                        ...form,
+                        title,
+                        published: false,
+                        status: 'draft',
+                        attachments: form.attachments || [],
+                    },
+                    null
+                );
+                this.tplActive = { ...this.tplActive, ...created, id: created.id };
+                this.activities = [created, ...this.activities.filter((a) => a.id !== created.id)];
+                return created.id;
+            },
             async onTplFileSelected(event) {
                 const file = event.target?.files?.[0];
                 event.target.value = '';
-                if (!file || !this.tplActive?.id || this.tplModal !== 'edit-lab') return;
+                if (!file || this.tplModal !== 'edit-lab' || !this.tplActive) return;
                 this.tplError = '';
                 this.tplUploading = true;
                 try {
-                    const meta = await window.TeacherClassroom.uploadActivityAttachment(this.tplActive.id, file);
+                    const activityId = await this.ensureTplDraft();
+                    const meta = await window.TeacherClassroom.uploadActivityAttachment(activityId, file);
                     this.tplForm.attachments = [...(this.tplForm.attachments || []), meta];
                     this.activities = this.activities.map((a) =>
-                        a.id === this.tplActive.id ? { ...a, attachments: this.tplForm.attachments } : a
+                        a.id === activityId ? { ...a, attachments: this.tplForm.attachments } : a
                     );
                 } catch (e) {
                     console.error(e);
@@ -590,7 +614,11 @@
             async removeTplAttachment(index) {
                 const list = this.tplForm.attachments || [];
                 const item = list[index];
-                if (!item || !this.tplActive?.id) return;
+                if (!item || !this.tplActive) return;
+                if (!this.tplActive.id && item.storagePath) {
+                    this.tplError = 'Save the lab once before removing cloud files.';
+                    return;
+                }
                 try {
                     if (item.storagePath) {
                         await window.TeacherClassroom.deleteActivityAttachment(this.tplActive.id, item.storagePath);
@@ -980,7 +1008,40 @@
                         text: (o.text || '').trim(),
                     })),
                 }));
+                form.elements = this.clampElementVolumes(form.elements);
                 return form;
+            },
+            /** Largest apparatus maxVol (container capacity) × 1.5 — ceiling for element volumes. */
+            elementVolumeCeiling() {
+                const apps = this.tplForm?.apparatus || [];
+                let peak = 0;
+                for (const a of apps) {
+                    const v = Number(a.maxVol);
+                    if (Number.isFinite(v) && v > peak) peak = v;
+                }
+                if (peak <= 0) peak = 250; // catalog default beaker-ish
+                return Math.round(peak * 1.5 * 100) / 100;
+            },
+            clampElementVolumes(elements) {
+                const ceiling = this.elementVolumeCeiling();
+                const minFloor = 2;
+                const minCap = 50;
+                return (elements || []).map((e) => {
+                    let minV = Number(e.minVol);
+                    let maxV = Number(e.maxVol);
+                    let vol = Number(e.volume);
+                    if (!Number.isFinite(minV)) minV = minFloor;
+                    if (!Number.isFinite(maxV)) maxV = Math.min(ceiling, 100);
+                    if (!Number.isFinite(vol)) vol = minV;
+                    // min volume: between 2 and 50
+                    minV = Math.min(minCap, Math.max(minFloor, minV));
+                    // max: at least min, at most ceiling; no negatives
+                    maxV = Math.min(ceiling, Math.max(minV, maxV));
+                    if (maxV < 0) maxV = minV;
+                    // default / initial between min and max
+                    vol = Math.min(maxV, Math.max(minV, vol));
+                    return { ...e, minVol: minV, maxVol: maxV, volume: vol };
+                });
             },
             students() {
                 return Array.isArray(this.classData?.students) ? this.classData.students : [];
