@@ -28,8 +28,9 @@
                 class="inline-flex items-center justify-center rounded-2xl bg-[#1B2CC1] px-6 py-3.5 text-xs font-bold text-white shadow-lg shadow-[#1B2CC1]/25 transition-all duration-200 hover:bg-[#1B2CC1]/90 hover:shadow-xl hover:shadow-[#1B2CC1]/35 active:scale-[0.98]">
                 Sign in to dashboard
             </a>
-            <a href="{{ asset('downloads/scilense-ar.apk') }}"
-                download="scilense-ar.apk"
+            <a href="https://drive.google.com/uc?export=download&id=1mhKDXLxSSXt4PK6S84Eo-jt4BKI4dKpw"
+                target="_blank"
+                rel="noopener noreferrer"
                 class="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#1B2CC1]/40 bg-[#ABD2FA]/25 px-6 py-3.5 text-xs font-bold text-[#091540] transition-all duration-200 hover:border-[#1B2CC1] hover:bg-[#ABD2FA]/45 active:scale-[0.98]">
                 <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -42,7 +43,7 @@
             </a>
         </div>
         <p class="mt-3 text-center text-[11px] font-medium text-[#091540]/55">
-            Android APK · allow install from browser if prompted · teachers use Sign in above
+            Android APK (Google Drive) · allow install from browser if prompted · teachers use Sign in above
         </p>
     </div>
 </section>
