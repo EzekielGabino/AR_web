@@ -28,11 +28,9 @@
             <div class="space-y-12 transition-all duration-300 sm:space-y-16">
                 @include('public.partials.overview')
 
-                @include('public.partials.how')
+                @include('public.partials.ar-chemistry')
 
-                @include('public.partials.features')
-
-                @include('public.partials.team')
+                @include('public.partials.lab-videos')
             </div>
         </main>
 

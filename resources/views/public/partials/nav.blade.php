@@ -9,6 +9,8 @@
         </a>
         <nav class="flex shrink-0 items-center gap-2 text-xs font-bold text-[#091540]/80 sm:gap-3">
             <a href="#overview" class="hidden transition-colors hover:text-[#1B2CC1] sm:inline">Overview</a>
+            <a href="#ar-lab" class="hidden transition-colors hover:text-[#1B2CC1] md:inline">AR lab</a>
+            <a href="#see-the-lab" class="hidden transition-colors hover:text-[#1B2CC1] lg:inline">See the lab</a>
             <button type="button"
                 @click="homeHelpOpen = true"
                 class="flex h-9 w-9 items-center justify-center rounded-full border border-[#ABD2FA]/70 bg-white text-sm font-black text-[#1B2CC1] shadow-sm transition hover:border-[#1B2CC1] hover:bg-[#ABD2FA]/30"
