@@ -13,13 +13,13 @@
 
         {{-- Main Headline --}}
         <h1 class="mx-auto max-w-3xl text-3xl font-extrabold tracking-tight text-[#091540] sm:text-5xl sm:leading-tight">
-            Manage classes, lab activities, and AR materials in one place
+            Manage classes and AR lab activities in one place
         </h1>
 
         {{-- Subtitle --}}
         <p class="mx-auto mt-5 max-w-2xl text-sm font-medium leading-relaxed text-[#091540]/75 sm:text-base">
-            SciLens AR helps educators assign laboratory activities, track student work,
-            and explore 3D teaching models — built for Manaoag National High School STE.
+            SciLens AR helps educators create classes, publish guided AR chemistry labs,
+            and review student work — built for Manaoag National High School STE.
         </p>
 
         {{-- Call to Action Buttons --}}
@@ -28,10 +28,21 @@
                 class="inline-flex items-center justify-center rounded-2xl bg-[#1B2CC1] px-6 py-3.5 text-xs font-bold text-white shadow-lg shadow-[#1B2CC1]/25 transition-all duration-200 hover:bg-[#1B2CC1]/90 hover:shadow-xl hover:shadow-[#1B2CC1]/35 active:scale-[0.98]">
                 Sign in to dashboard
             </a>
+            <a href="{{ asset('downloads/scilense-ar.apk') }}"
+                download="scilense-ar.apk"
+                class="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#1B2CC1]/40 bg-[#ABD2FA]/25 px-6 py-3.5 text-xs font-bold text-[#091540] transition-all duration-200 hover:border-[#1B2CC1] hover:bg-[#ABD2FA]/45 active:scale-[0.98]">
+                <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Download student app
+            </a>
             <a href="#overview"
                 class="inline-flex items-center justify-center rounded-2xl border border-[#7692FF]/40 bg-white/80 px-6 py-3.5 text-xs font-bold text-[#091540] backdrop-blur-xs transition-all duration-200 hover:border-[#1B2CC1] hover:bg-[#ABD2FA]/20 active:scale-[0.98]">
                 Learn more
             </a>
         </div>
+        <p class="mt-3 text-center text-[11px] font-medium text-[#091540]/55">
+            Android APK · allow install from browser if prompted · teachers use Sign in above
+        </p>
     </div>
 </section>

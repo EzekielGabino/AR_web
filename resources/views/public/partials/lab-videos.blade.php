@@ -1,4 +1,4 @@
-{{-- Student AR lab previews — add files under public/videos/ or set YouTube IDs below --}}
+{{-- Student AR lab previews — phone frame (9:16), no fullscreen --}}
 <section id="see-the-lab" class="relative overflow-hidden rounded-3xl border border-[#ABD2FA]/40 bg-white/90 px-4 py-14 shadow-sm sm:px-8 sm:py-16">
     <div class="relative mx-auto max-w-6xl">
         <div class="mx-auto max-w-2xl text-center">
@@ -14,14 +14,12 @@
         </div>
 
         @php
-            // Option A: local files in public/videos/ (mp4)
-            // Option B: set youtube id strings; leave '' to use local path
             $clips = [
                 [
                     'title' => 'Place apparatus',
                     'blurb' => 'Students select glassware and place it on a detected surface in AR.',
                     'file' => 'videos/lab-place-apparatus.mp4',
-                    'youtube' => '', // e.g. 'dQw4w9WgXcQ'
+                    'youtube' => '',
                 ],
                 [
                     'title' => 'Add elements & follow steps',
@@ -38,32 +36,38 @@
             ];
         @endphp
 
-        <div class="mt-10 grid gap-6 md:grid-cols-3">
+        <div class="mt-10 grid grid-cols-1 justify-items-center gap-8 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($clips as $clip)
-                <article class="flex flex-col overflow-hidden rounded-2xl border border-[#ABD2FA]/50 bg-slate-50/80 shadow-sm">
-                    <div class="relative aspect-video bg-[#091540]">
-                        @if (!empty($clip['youtube']))
-                            <iframe
-                                class="absolute inset-0 h-full w-full"
-                                src="https://www.youtube-nocookie.com/embed/{{ $clip['youtube'] }}"
-                                title="{{ $clip['title'] }}"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowfullscreen
-                                loading="lazy"></iframe>
-                        @else
-                            <video
-                                class="absolute inset-0 h-full w-full object-cover"
-                                controls
-                                playsinline
-                                preload="metadata"
-                                poster="{{ asset('icons/logo.png') }}">
-                                <source src="{{ asset($clip['file']) }}" type="video/mp4">
-                                Your browser does not support embedded video.
-                            </video>
-                            {{-- If the file is missing, the player stays empty; add mp4s under public/videos/ --}}
-                        @endif
+                <article class="flex w-full max-w-[280px] flex-col overflow-hidden rounded-[1.75rem] border border-[#ABD2FA]/50 bg-slate-50/80 shadow-md shadow-[#1B2CC1]/5">
+                    {{-- Phone bezel --}}
+                    <div class="bg-[#091540] px-3 pt-3">
+                        <div class="mx-auto mb-2 h-1.5 w-16 rounded-full bg-white/20"></div>
+                        <div class="relative mx-auto aspect-[9/16] w-full overflow-hidden rounded-xl bg-black">
+                            @if (!empty($clip['youtube']))
+                                <iframe
+                                    class="absolute inset-0 h-full w-full"
+                                    src="https://www.youtube-nocookie.com/embed/{{ $clip['youtube'] }}?playsinline=1&fs=0&modestbranding=1&rel=0"
+                                    title="{{ $clip['title'] }}"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen="false"
+                                    loading="lazy"></iframe>
+                            @else
+                                <video
+                                    class="absolute inset-0 h-full w-full object-cover"
+                                    controls
+                                    playsinline
+                                    preload="metadata"
+                                    controlslist="nofullscreen nodownload noremoteplayback"
+                                    disablepictureinpicture
+                                    disableremoteplayback
+                                    poster="{{ asset('icons/logo.png') }}">
+                                    <source src="{{ asset($clip['file']) }}" type="video/mp4">
+                                    Your browser does not support embedded video.
+                                </video>
+                            @endif
+                        </div>
                     </div>
-                    <div class="flex flex-1 flex-col p-5">
+                    <div class="flex flex-1 flex-col p-4">
                         <h3 class="text-sm font-black text-[#091540]">{{ $clip['title'] }}</h3>
                         <p class="mt-1.5 text-xs font-medium leading-relaxed text-[#091540]/70">{{ $clip['blurb'] }}</p>
                     </div>
@@ -72,8 +76,8 @@
         </div>
 
         <p class="mt-6 text-center text-[11px] font-medium text-[#091540]/50">
-            Tip for admins: put MP4 files in <code class="rounded bg-slate-100 px-1">public/videos/</code>
-            or set a YouTube id on each clip in <code class="rounded bg-slate-100 px-1">lab-videos.blade.php</code>.
+            Clips use a phone-shaped frame (9:16). Add MP4s under <code class="rounded bg-slate-100 px-1">public/videos/</code>
+            or set a YouTube id in this partial.
         </p>
     </div>
 </section>

@@ -8,8 +8,9 @@
         <div class="flex flex-wrap gap-2">
             <input type="search"
                 x-model="q"
-                placeholder="Search symbol or name…"
-                class="w-48 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 placeholder:text-slate-300 focus:border-[#7CD5F3] focus:outline-none focus:ring-2 focus:ring-[#7CD5F3]/20">
+                @input.debounce.200ms="onSearch()"
+                placeholder="Search symbol, name, or number…"
+                class="w-56 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 placeholder:text-slate-300 focus:border-[#7CD5F3] focus:outline-none focus:ring-2 focus:ring-[#7CD5F3]/20">
         </div>
     </div>
 
@@ -51,7 +52,7 @@
         </div>
     </div>
 
-    <div x-show="selected" x-cloak class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div x-show="selected" x-ref="detailCard" id="element-detail-card" x-cloak class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="flex items-center gap-3">
                 <div class="flex h-16 w-16 flex-col items-center justify-center rounded-xl text-white shadow"
@@ -66,7 +67,11 @@
             </div>
             <button type="button" @click="selected = null" class="text-xs font-bold text-slate-400 hover:text-slate-600">Close</button>
         </div>
-        <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/80 p-3">
+            <p class="text-[10px] font-bold uppercase tracking-wide text-indigo-500">Appearance</p>
+            <p class="mt-0.5 text-sm font-semibold text-slate-800" x-text="(selected?.appearance && String(selected.appearance).trim()) ? selected.appearance : '—'"></p>
+        </div>
+        <dl class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div class="rounded-xl bg-slate-50 p-3">
                 <dt class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Atomic mass</dt>
                 <dd class="text-sm font-black text-slate-800" x-text="selected?.atomic_mass != null ? Number(selected.atomic_mass).toFixed(3) : '—'"></dd>
@@ -78,10 +83,6 @@
             <div class="rounded-xl bg-slate-50 p-3">
                 <dt class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Phase</dt>
                 <dd class="text-sm font-black text-slate-800" x-text="selected?.phase || '—'"></dd>
-            </div>
-            <div class="rounded-xl bg-slate-50 p-3">
-                <dt class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Appearance</dt>
-                <dd class="text-sm font-semibold text-slate-800" x-text="selected?.appearance || '—'"></dd>
             </div>
             <div class="rounded-xl bg-slate-50 p-3">
                 <dt class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Discovered by</dt>
@@ -187,12 +188,43 @@
             matches(el) {
                 const q = (this.q || '').trim().toLowerCase();
                 if (!q) return false;
-                return (el.symbol || '').toLowerCase().includes(q) ||
+                return (el.symbol || '').toLowerCase() === q ||
+                    (el.symbol || '').toLowerCase().startsWith(q) ||
+                    (el.name || '').toLowerCase().startsWith(q) ||
                     (el.name || '').toLowerCase().includes(q) ||
                     String(el.number || '') === q;
             },
+            findSearchMatch() {
+                const q = (this.q || '').trim().toLowerCase();
+                if (!q || !this.elements.length) return null;
+                // Prefer exact symbol, then exact name, then number, then startsWith, then includes
+                const list = this.elements;
+                let hit = list.find((el) => (el.symbol || '').toLowerCase() === q);
+                if (hit) return hit;
+                hit = list.find((el) => (el.name || '').toLowerCase() === q);
+                if (hit) return hit;
+                hit = list.find((el) => String(el.number || '') === q);
+                if (hit) return hit;
+                hit = list.find((el) => (el.symbol || '').toLowerCase().startsWith(q));
+                if (hit) return hit;
+                hit = list.find((el) => (el.name || '').toLowerCase().startsWith(q));
+                if (hit) return hit;
+                return list.find((el) => (el.name || '').toLowerCase().includes(q)) || null;
+            },
+            onSearch() {
+                const hit = this.findSearchMatch();
+                if (hit) {
+                    this.select(hit);
+                }
+            },
             select(el) {
                 this.selected = el;
+                this.$nextTick(() => {
+                    const card = this.$refs.detailCard;
+                    if (card && typeof card.scrollIntoView === 'function') {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                });
             },
             get gridCells() {
                 const byPos = {};
