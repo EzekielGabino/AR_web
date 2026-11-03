@@ -11,12 +11,6 @@
             activityId: @js($activityId),
             loading: true,
             error: '',
-            publishValidation: {
-                open: false,
-                title: '',
-                message: '',
-                issues: [],
-            },
             saving: false,
             publishing: false,
             attUploading: false,
@@ -230,10 +224,27 @@
             },
             answerForQuestion(sub, q, index) {
                 const answers = sub?.answers;
-                if (!Array.isArray(answers)) return null;
-                const order = q.order != null ? Number(q.order) : index + 1;
-                const hit = answers.find(a => a && (Number(a.order) === order || Number(a.order) === index + 1 || Number(a.order) === index));
-                return hit ? (hit.answer ?? hit.selected ?? null) : null;
+                if (!Array.isArray(answers) || !answers.length) return null;
+
+                // Mobile stores { questionIndex: 0-based, order: 1-based, answer: "A"|"B"|... }
+                let hit = answers.find((a) => a && Number(a.questionIndex) === Number(index));
+                if (hit) return hit.answer ?? hit.selected ?? null;
+
+                // 1-based order aligned with display index
+                hit = answers.find((a) => a && Number(a.order) === Number(index) + 1);
+                if (hit) return hit.answer ?? hit.selected ?? null;
+
+                // Explicit question.order only when it matches 1-based convention
+                if (q && q.order != null && Number(q.order) >= 1) {
+                    hit = answers.find((a) => a && Number(a.order) === Number(q.order));
+                    if (hit) return hit.answer ?? hit.selected ?? null;
+                }
+
+                // Positional fallback (same array order as quiz)
+                const pos = answers[index];
+                if (pos) return pos.answer ?? pos.selected ?? null;
+
+                return null;
             },
             optionText(q, optionId) {
                 const opts = Array.isArray(q?.options) ? q.options : [];
@@ -277,80 +288,10 @@
                     this.returning = false;
                 }
             },
-
-            showPublishValidation(issues) {
-                this.publishValidation = {
-                    open: true,
-                    title: 'Cannot publish activity yet',
-                    message: 'Please fix the following settings before publishing this activity to students.',
-                    issues,
-                };
-            },
-
-            closePublishValidation() {
-                this.publishValidation.open = false;
-            },
-
-            validateForPublish() {
-                const issues = [];
-
-                    // Title
-                    if (!(this.form.title || '').trim()) {
-                        issues.push('Enter an activity title.');
-                    }
-
-                    // Due date
-                    if (!this.form.dueDate) {
-                        issues.push('Set a due date.');
-                    }
-
-                    // Due time
-                    if (!this.form.dueTime) {
-                        issues.push('Set a due time.');
-                    }
-
-                    // Check the deadline only when both fields are present.
-                    if (this.form.dueDate && this.form.dueTime) {
-                        const time = this.form.dueTime.length === 5
-                            ? this.form.dueTime + ':00'
-                            : this.form.dueTime;
-
-                    // Uses the teacher's local time zone.
-                    const deadline = new Date(
-                        this.form.dueDate + 'T' + time
-                    );
-
-                    if (Number.isNaN(deadline.getTime())) {
-                        issues.push('The due date or due time is invalid.');
-                    } else if (deadline.getTime() <= Date.now()) {
-                        issues.push('The deadline must be in the future. Choose a later date and time.');
-                    }
-                }
-
-                // Max score
-                const maxScore = Number(this.form.maxScore);
-
-                if (
-                    this.form.maxScore === '' ||
-                    this.form.maxScore === null ||
-                    this.form.maxScore === undefined ||
-                    !Number.isFinite(maxScore) ||
-                    maxScore <= 0
-                ) {
-                    issues.push('Set a valid max score greater than zero.');
-                }
-
-                return {
-                    valid: issues.length === 0,
-                    issues,
-                };
-            },
-
             async saveDetails() {
                 this.saving = true;
                 this.message = '';
                 this.error = '';
-
                 try {
                     const patch = {
                         title: (this.form.title || '').trim(),
@@ -359,86 +300,38 @@
                         dueTime: this.form.dueTime || '',
                         maxScore: Number(this.form.maxScore) || 0,
                     };
-
-                    if (!patch.title) {
-                        throw new Error('Title is required.');
-                    }
-
-                    await window.TeacherClassroom.updateClassActivity(
-                        this.activityId,
-                        patch
-                    );
-
-                    this.activity = {
-                        ...this.activity,
-                        ...patch,
-                    };
-
+                    if (!patch.title) throw new Error('Title is required.');
+                    await window.TeacherClassroom.updateClassActivity(this.activityId, patch);
+                    this.activity = { ...this.activity, ...patch };
                     this.message = 'Details saved.';
-                    return true;
                 } catch (e) {
                     console.error(e);
                     this.error = e.message || 'Save failed.';
-                    return false;
                 } finally {
                     this.saving = false;
                 }
             },
-
             async publish() {
-                // Prevent publishing if required fields are invalid.
-                const validation = this.validateForPublish();
-
-                if (!validation.valid) {
-                    this.showPublishValidation(validation.issues);
+                if (!this.form.dueDate) {
+                    if (!confirm('No due date set. Publish anyway?')) return;
+                } else if (!confirm('Publish this lab? Students in the class will be able to complete it.')) {
                     return;
                 }
-
-                if (
-                    !confirm(
-                        'Publish this lab? Students in the class will be able to complete it.'
-                    )
-                ) {
-                    return;
-                }
-
                 this.publishing = true;
                 this.error = '';
                 this.message = '';
-
                 try {
-                    // Save the latest settings first.
-                    const saved = await this.saveDetails();
-
-                    // Do not publish if saving failed.
-                    if (!saved) {
-                        return;
-                    }
-
+                    await this.saveDetails();
                     const extra = {
                         title: (this.form.title || '').trim(),
                         description: (this.form.description || '').trim(),
-                        dueDate: this.form.dueDate,
-                        dueTime: this.form.dueTime,
-                        maxScore: Number(this.form.maxScore),
+                        dueDate: this.form.dueDate || '',
+                        dueTime: this.form.dueTime || '',
+                        maxScore: Number(this.form.maxScore) || 0,
                     };
-
-                    const res = await window.TeacherClassroom.publishClassActivity(
-                        this.activityId,
-                        extra
-                    );
-
-                    this.activity = {
-                        ...this.activity,
-                        ...res,
-                        ...extra,
-                    };
-
-                    this.submissions =
-                        await window.TeacherClassroom.fetchActivitySubmissions(
-                            this.activityId
-                        );
-
+                    const res = await window.TeacherClassroom.publishClassActivity(this.activityId, extra);
+                    this.activity = { ...this.activity, ...res, ...extra };
+                    this.submissions = await window.TeacherClassroom.fetchActivitySubmissions(this.activityId);
                     this.message = 'Published. Students can now take this lab.';
                     this.panel = 'students';
                 } catch (e) {
@@ -448,7 +341,6 @@
                     this.publishing = false;
                 }
             },
-
             async unpublish() {
                 if (!confirm('Unpublish? Students will no longer see this as an active assignment.')) return;
                 this.publishing = true;
@@ -824,129 +716,6 @@
             </div>
 
     </template>
-
-    {{-- Publish validation modal --}}
-    <div
-        x-show="publishValidation.open"
-        x-cloak
-        x-transition.opacity
-        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="publish-validation-title"
-        @keydown.escape.window="closePublishValidation()"
-    >
-        {{-- Backdrop --}}
-        <div
-            class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
-            @click="closePublishValidation()"
-        ></div>
-
-        {{-- Modal --}}
-        <div
-            x-show="publishValidation.open"
-            x-transition
-            class="relative w-full max-w-md overflow-hidden rounded-2xl border border-[#ABD2FA]/60 bg-white shadow-2xl"
-        >
-            {{-- Header --}}
-            <div class="border-b border-[#ABD2FA]/40 bg-[#ABD2FA]/15 px-5 py-4">
-                <div class="flex items-start gap-3">
-                    <div
-                        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#1B2CC1]/10 text-[#1B2CC1]"
-                    >
-                        <svg
-                            class="h-6 w-6"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            stroke-width="1.8"
-                            aria-hidden="true"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                d="M12 9v3.75m0 3h.008M10.29 3.86 1.82 18.14A1.75 1.75 0 0 0 3.32 20.8h17.36a1.75 1.75 0 0 0 1.5-2.66L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                            />
-                        </svg>
-                    </div>
-
-                    <div class="min-w-0 flex-1">
-                        <h2
-                            id="publish-validation-title"
-                            class="text-base font-black text-[#091540]"
-                            x-text="publishValidation.title"
-                        ></h2>
-
-                        <p
-                            class="mt-1 text-xs leading-relaxed text-slate-600"
-                            x-text="publishValidation.message"
-                        ></p>
-                    </div>
-
-                    <button
-                        type="button"
-                        @click="closePublishValidation()"
-                        class="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-white hover:text-slate-700"
-                        aria-label="Close validation dialog"
-                    >
-                        <svg
-                            class="h-5 w-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            stroke-width="2"
-                            aria-hidden="true"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                d="M6 6l12 12M18 6 6 18"
-                            />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            {{-- Validation issues --}}
-            <div class="px-5 py-5">
-                <p class="mb-3 text-[11px] font-extrabold uppercase tracking-wider text-[#1B2CC1]">
-                    Required corrections
-                </p>
-
-                <ul class="space-y-3">
-                    <template
-                        x-for="(issue, index) in publishValidation.issues"
-                        :key="index"
-                    >
-                        <li class="flex items-start gap-2.5 text-xs leading-relaxed text-slate-700">
-                            <span
-                                class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-50 text-[10px] font-black text-rose-600"
-                                x-text="'!'"
-                            ></span>
-
-                            <span x-text="issue"></span>
-                        </li>
-                    </template>
-                </ul>
-
-                <p class="mt-4 rounded-xl border border-[#ABD2FA]/50 bg-[#ABD2FA]/10 p-3 text-[11px] leading-relaxed text-[#091540]/80">
-                    Set a future deadline and a valid max score in
-                    <strong>Activity details</strong>. Your activity will remain a
-                    draft until you successfully publish it.
-                </p>
-
-                <div class="mt-5 flex justify-end">
-                    <button
-                        type="button"
-                        @click="closePublishValidation()"
-                        class="cursor-pointer rounded-xl bg-[#1B2CC1] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#091540]"
-                    >
-                        Return to settings
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 @endsection
 
