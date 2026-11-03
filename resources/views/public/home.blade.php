@@ -31,6 +31,8 @@
                 @include('public.partials.ar-chemistry')
 
                 @include('public.partials.lab-videos')
+
+                @include('public.partials.student-screens')
             </div>
         </main>
 
