@@ -6,365 +6,8 @@
 @include('teacher.partials.topbar')
 
 <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6"
-    x-data="{
-            classId: @js($classId),
-            activityId: @js($activityId),
-            loading: true,
-            error: '',
-            saving: false,
-            publishing: false,
-            attUploading: false,
-            message: '',
-            activity: null,
-            classData: null,
-            submissions: [],
-            panel: 'details',
-            form: { title: '', description: '', dueDate: '', dueTime: '', maxScore: 0 },
-            // Students bucket UI
-            bucketView: 'summary', // summary | list | review
-            activeBucket: null,
-            reviewRow: null,
-            reviewScore: '',
-            reviewFeedback: '',
-            returning: false,
-            async init() {
-                await this.waitModule();
-                await this.load();
-            },
-            waitModule() {
-                if (window.TeacherClassroom) return Promise.resolve();
-                return new Promise((resolve, reject) => {
-                    const t = setTimeout(() => reject(new Error('Classroom module failed to load')), 8000);
-                    const check = () => {
-                        if (window.TeacherClassroom) { clearTimeout(t); resolve(); }
-                        else setTimeout(check, 50);
-                    };
-                    check();
-                });
-            },
-            async load() {
-                this.loading = true;
-                this.error = '';
-                this.message = '';
-                try {
-                    const [act, cls] = await Promise.all([
-                        window.TeacherClassroom.getClassActivity(this.activityId),
-                        window.TeacherClassroom.loadClass(this.classId),
-                    ]);
-                    if (!act) throw new Error('Activity not found.');
-                    this.activity = act;
-                    this.classData = cls;
-                    this.form = {
-                        title: act.title || '',
-                        description: act.description || '',
-                        dueDate: act.dueDate || '',
-                        dueTime: act.dueTime || '',
-                        maxScore: act.maxScore != null ? act.maxScore : (Array.isArray(act.quiz) ? act.quiz.length : 0),
-                    };
-                    if (this.isPublished()) {
-                        this.submissions = await window.TeacherClassroom.fetchActivitySubmissions(this.activityId);
-                    } else {
-                        this.submissions = [];
-                    }
-                } catch (e) {
-                    console.error(e);
-                    this.error = e.message || 'Failed to load activity.';
-                } finally {
-                    this.loading = false;
-                }
-            },
-            async onActivityFileSelected(event) {
-                const file = event.target?.files?.[0];
-                event.target.value = '';
-                if (!file || !this.activityId || this.isPublished()) return;
-                this.attUploading = true;
-                this.error = '';
-                try {
-                    const meta = await window.TeacherClassroom.uploadActivityAttachment(this.activityId, file);
-                    const list = [...(this.activity.attachments || []), meta];
-                    this.activity = { ...this.activity, attachments: list };
-                } catch (e) {
-                    console.error(e);
-                    this.error = e.message || 'Upload failed.';
-                } finally {
-                    this.attUploading = false;
-                }
-            },
-            async removeActivityAttachment(index) {
-                if (this.isPublished()) return;
-                const list = this.activity?.attachments || [];
-                const item = list[index];
-                if (!item) return;
-                try {
-                    if (item.storagePath) {
-                        await window.TeacherClassroom.deleteActivityAttachment(this.activityId, item.storagePath);
-                    }
-                    this.activity = {
-                        ...this.activity,
-                        attachments: list.filter((_, i) => i !== index),
-                    };
-                } catch (e) {
-                    console.error(e);
-                    this.error = e.message || 'Could not remove file.';
-                }
-            },
-            isPublished() {
-                return this.activity && (this.activity.published === true || this.activity.status === 'published');
-            },
-            classroomUrl() {
-                return @js(url('/classes')) + '/' + this.classId;
-            },
-            studentList() {
-                const raw = this.classData?.students;
-                return Array.isArray(raw) ? raw : [];
-            },
-            studentId(s) {
-                if (!s) return '';
-                if (typeof s === 'string') return s;
-                return s.uid || s.id || s.studentId || s.email || '';
-            },
-            studentLabel(s) {
-                if (!s) return 'Student';
-                if (typeof s === 'string') return s;
-                return s.name || s.displayName || s.email || s.uid || 'Student';
-            },
-            submissionByStudent() {
-                const map = {};
-                (this.submissions || []).forEach((sub) => {
-                    const sid = sub.studentId || sub.uid || '';
-                    if (sid) map[sid] = sub;
-                });
-                return map;
-            },
-            dueMoment() {
-                const d = this.activity?.dueDate || this.form.dueDate;
-                if (!d) return null;
-                const t = this.activity?.dueTime || this.form.dueTime || '23:59';
-                const m = new Date(d + 'T' + (t.length === 5 ? t + ':00' : t));
-                return isNaN(m.getTime()) ? null : m;
-            },
-            isPastDue() {
-                const m = this.dueMoment();
-                return m ? m.getTime() < Date.now() : false;
-            },
-            buckets() {
-                const by = this.submissionByStudent();
-                const pending = [];
-                const completed = [];
-                const pastDue = [];
-                const returned = [];
-                const seen = new Set();
+    x-data="activityShowPage({ classId: @js($classId), activityId: @js($activityId) })">
 
-                this.studentList().forEach((s) => {
-                    const sid = this.studentId(s);
-                    if (!sid || seen.has(sid)) return;
-                    seen.add(sid);
-                    const sub = by[sid];
-                    const row = { student: s, submission: sub || null, label: (sub && sub.studentName) ? sub.studentName : this.studentLabel(s) };
-                    if (!sub) {
-                        if (this.isPastDue()) pastDue.push(row);
-                        else pending.push(row);
-                        return;
-                    }
-                    const st = (sub.status || '').toLowerCase();
-                    if (st === 'returned' || sub.returnedAt) returned.push(row);
-                    else if (st === 'submitted' || st === 'graded' || sub.submittedAt) completed.push(row);
-                    else pending.push(row);
-                });
-
-                // Submissions from students not listed on the class roster
-                Object.keys(by).forEach((sid) => {
-                    if (seen.has(sid)) return;
-                    const sub = by[sid];
-                    const st = (sub.status || '').toLowerCase();
-                    const row = { student: { uid: sid }, submission: sub, label: sub.studentName || sid };
-                    if (st === 'returned' || sub.returnedAt) returned.push(row);
-                    else completed.push(row);
-                });
-
-                return { pending, completed, pastDue, returned };
-            },
-
-            bucketMeta() {
-                return [
-                    { key: 'pending', title: 'Pending', empty: 'No pending students.', tone: 'slate' },
-                    { key: 'completed', title: 'Completed', empty: 'No completed submissions yet.', tone: 'emerald' },
-                    { key: 'pastDue', title: 'Past due', empty: 'No past-due students.', tone: 'rose' },
-                    { key: 'returned', title: 'Returned', empty: 'No returned work.', tone: 'sky' },
-                ];
-            },
-            openBucket(key) {
-                this.activeBucket = key;
-                this.bucketView = 'list';
-                this.reviewRow = null;
-            },
-            backToBuckets() {
-                this.bucketView = 'summary';
-                this.activeBucket = null;
-                this.reviewRow = null;
-            },
-            backToList() {
-                this.bucketView = 'list';
-                this.reviewRow = null;
-                this.reviewScore = '';
-                this.reviewFeedback = '';
-            },
-            openReview(row) {
-                if (!row?.submission) return;
-                this.reviewRow = row;
-                this.reviewScore = row.submission.score != null ? String(row.submission.score) : '';
-                this.reviewFeedback = row.submission.feedback || '';
-                this.bucketView = 'review';
-            },
-            quizQuestions() {
-                const q = this.activity?.quiz;
-                if (Array.isArray(q)) return q;
-                if (q && Array.isArray(q.questions)) return q.questions;
-                return [];
-            },
-            answerForQuestion(sub, q, index) {
-                const answers = sub?.answers;
-                if (!Array.isArray(answers) || !answers.length) return null;
-
-                // Mobile stores { questionIndex: 0-based, order: 1-based, answer: "A"|"B"|... }
-                let hit = answers.find((a) => a && Number(a.questionIndex) === Number(index));
-                if (hit) return hit.answer ?? hit.selected ?? null;
-
-                // 1-based order aligned with display index
-                hit = answers.find((a) => a && Number(a.order) === Number(index) + 1);
-                if (hit) return hit.answer ?? hit.selected ?? null;
-
-                // Explicit question.order only when it matches 1-based convention
-                if (q && q.order != null && Number(q.order) >= 1) {
-                    hit = answers.find((a) => a && Number(a.order) === Number(q.order));
-                    if (hit) return hit.answer ?? hit.selected ?? null;
-                }
-
-                // Positional fallback (same array order as quiz)
-                const pos = answers[index];
-                if (pos) return pos.answer ?? pos.selected ?? null;
-
-                return null;
-            },
-            optionText(q, optionId) {
-                const opts = Array.isArray(q?.options) ? q.options : [];
-                const o = opts.find(x => String(x.id) === String(optionId) || String(x.text) === String(optionId));
-                if (!o) return optionId || '—';
-                const id = o.id != null ? String(o.id).toUpperCase() : '';
-                return id ? (id + '. ' + (o.text || '')) : (o.text || optionId);
-            },
-            correctOptionId(q) {
-                return q.correctOptionId || q.correctOption || q.correct || '';
-            },
-            async returnWork() {
-                if (!this.reviewRow?.submission?.id) return;
-                const score = Number(this.reviewScore);
-                if (Number.isNaN(score) || score < 0) {
-                    this.error = 'Enter a valid score.';
-                    return;
-                }
-                const max = Number(this.activity?.maxScore || this.form.maxScore || 0);
-                if (max > 0 && score > max) {
-                    this.error = 'Score cannot exceed max score (' + max + ').';
-                    return;
-                }
-                this.returning = true;
-                this.error = '';
-                this.message = '';
-                try {
-                    const updated = await window.TeacherClassroom.returnActivitySubmission(
-                        this.activityId,
-                        this.reviewRow.submission.id,
-                        { score, feedback: (this.reviewFeedback || '').trim() || null }
-                    );
-                    // refresh submissions list
-                    this.submissions = await window.TeacherClassroom.fetchActivitySubmissions(this.activityId);
-                    this.message = 'Returned to student with score ' + score + (max ? (' / ' + max) : '') + '.';
-                    this.backToBuckets();
-                } catch (e) {
-                    console.error(e);
-                    this.error = e.message || 'Could not return submission.';
-                } finally {
-                    this.returning = false;
-                }
-            },
-            async saveDetails() {
-                this.saving = true;
-                this.message = '';
-                this.error = '';
-                try {
-                    const patch = {
-                        title: (this.form.title || '').trim(),
-                        description: (this.form.description || '').trim(),
-                        dueDate: this.form.dueDate || '',
-                        dueTime: this.form.dueTime || '',
-                        maxScore: Number(this.form.maxScore) || 0,
-                    };
-                    if (!patch.title) throw new Error('Title is required.');
-                    await window.TeacherClassroom.updateClassActivity(this.activityId, patch);
-                    this.activity = { ...this.activity, ...patch };
-                    this.message = 'Details saved.';
-                } catch (e) {
-                    console.error(e);
-                    this.error = e.message || 'Save failed.';
-                } finally {
-                    this.saving = false;
-                }
-            },
-            async publish() {
-                if (!this.form.dueDate) {
-                    if (!confirm('No due date set. Publish anyway?')) return;
-                } else if (!confirm('Publish this lab? Students in the class will be able to complete it.')) {
-                    return;
-                }
-                this.publishing = true;
-                this.error = '';
-                this.message = '';
-                try {
-                    await this.saveDetails();
-                    const extra = {
-                        title: (this.form.title || '').trim(),
-                        description: (this.form.description || '').trim(),
-                        dueDate: this.form.dueDate || '',
-                        dueTime: this.form.dueTime || '',
-                        maxScore: Number(this.form.maxScore) || 0,
-                    };
-                    const res = await window.TeacherClassroom.publishClassActivity(this.activityId, extra);
-                    this.activity = { ...this.activity, ...res, ...extra };
-                    this.submissions = await window.TeacherClassroom.fetchActivitySubmissions(this.activityId);
-                    this.message = 'Published. Students can now take this lab.';
-                    this.panel = 'students';
-                } catch (e) {
-                    console.error(e);
-                    this.error = e.message || 'Publish failed.';
-                } finally {
-                    this.publishing = false;
-                }
-            },
-            async unpublish() {
-                if (!confirm('Unpublish? Students will no longer see this as an active assignment.')) return;
-                this.publishing = true;
-                this.error = '';
-                try {
-                    const res = await window.TeacherClassroom.unpublishClassActivity(this.activityId);
-                    this.activity = { ...this.activity, ...res };
-                    this.message = 'Moved back to draft.';
-                    this.panel = 'details';
-                } catch (e) {
-                    this.error = e.message || 'Unpublish failed.';
-                } finally {
-                    this.publishing = false;
-                }
-            },
-            formatWhen(v) {
-                if (!v) return '—';
-                try {
-                    if (v.toDate) return v.toDate().toLocaleString();
-                    if (v.seconds) return new Date(v.seconds * 1000).toLocaleString();
-                    return new Date(v).toLocaleString();
-                } catch { return String(v); }
-            },
-         }">
     <div class="mb-4">
         <a :href="classroomUrl()" class="text-xs font-bold text-slate-500 hover:text-[#50aed0]">← Back to class</a>
     </div>
@@ -717,6 +360,375 @@
 
     </template>
 </div>
+
+<script>
+function activityShowPage(config) {
+    return {
+            classId: config.classId,
+            activityId: config.activityId,
+            loading: true,
+            error: '',
+            saving: false,
+            publishing: false,
+            attUploading: false,
+            message: '',
+            activity: null,
+            classData: null,
+            submissions: [],
+            panel: 'details',
+            form: { title: '', description: '', dueDate: '', dueTime: '', maxScore: 0 },
+            // Students bucket UI
+            bucketView: 'summary', // summary | list | review
+            activeBucket: null,
+            reviewRow: null,
+            reviewScore: '',
+            reviewFeedback: '',
+            returning: false,
+            async init() {
+                await this.waitModule();
+                await this.load();
+            },
+            waitModule() {
+                if (window.TeacherClassroom) return Promise.resolve();
+                return new Promise((resolve, reject) => {
+                    const t = setTimeout(() => reject(new Error('Classroom module failed to load')), 8000);
+                    const check = () => {
+                        if (window.TeacherClassroom) { clearTimeout(t); resolve(); }
+                        else setTimeout(check, 50);
+                    };
+                    check();
+                });
+            },
+            async load() {
+                this.loading = true;
+                this.error = '';
+                this.message = '';
+                try {
+                    const [act, cls] = await Promise.all([
+                        window.TeacherClassroom.getClassActivity(this.activityId),
+                        window.TeacherClassroom.loadClass(this.classId),
+                    ]);
+                    if (!act) throw new Error('Activity not found.');
+                    this.activity = act;
+                    this.classData = cls;
+                    this.form = {
+                        title: act.title || '',
+                        description: act.description || '',
+                        dueDate: act.dueDate || '',
+                        dueTime: act.dueTime || '',
+                        maxScore: act.maxScore != null ? act.maxScore : (Array.isArray(act.quiz) ? act.quiz.length : 0),
+                    };
+                    if (this.isPublished()) {
+                        this.submissions = await window.TeacherClassroom.fetchActivitySubmissions(this.activityId);
+                    } else {
+                        this.submissions = [];
+                    }
+                } catch (e) {
+                    console.error(e);
+                    this.error = e.message || 'Failed to load activity.';
+                } finally {
+                    this.loading = false;
+                }
+            },
+            async onActivityFileSelected(event) {
+                const file = event.target?.files?.[0];
+                event.target.value = '';
+                if (!file || !this.activityId || this.isPublished()) return;
+                this.attUploading = true;
+                this.error = '';
+                try {
+                    const meta = await window.TeacherClassroom.uploadActivityAttachment(this.activityId, file);
+                    const list = [...(this.activity.attachments || []), meta];
+                    this.activity = { ...this.activity, attachments: list };
+                } catch (e) {
+                    console.error(e);
+                    this.error = e.message || 'Upload failed.';
+                } finally {
+                    this.attUploading = false;
+                }
+            },
+            async removeActivityAttachment(index) {
+                if (this.isPublished()) return;
+                const list = this.activity?.attachments || [];
+                const item = list[index];
+                if (!item) return;
+                try {
+                    if (item.storagePath) {
+                        await window.TeacherClassroom.deleteActivityAttachment(this.activityId, item.storagePath);
+                    }
+                    this.activity = {
+                        ...this.activity,
+                        attachments: list.filter((_, i) => i !== index),
+                    };
+                } catch (e) {
+                    console.error(e);
+                    this.error = e.message || 'Could not remove file.';
+                }
+            },
+            isPublished() {
+                return this.activity && (this.activity.published === true || this.activity.status === 'published');
+            },
+            classroomUrl() {
+                return @js(url('/classes')) + '/' + this.classId;
+            },
+            studentList() {
+                const raw = this.classData?.students;
+                return Array.isArray(raw) ? raw : [];
+            },
+            studentId(s) {
+                if (!s) return '';
+                if (typeof s === 'string') return s;
+                return s.uid || s.id || s.studentId || s.email || '';
+            },
+            studentLabel(s) {
+                if (!s) return 'Student';
+                if (typeof s === 'string') return s;
+                return s.name || s.displayName || s.email || s.uid || 'Student';
+            },
+            submissionByStudent() {
+                const map = {};
+                (this.submissions || []).forEach((sub) => {
+                    const sid = sub.studentId || sub.uid || '';
+                    if (sid) map[sid] = sub;
+                });
+                return map;
+            },
+            dueMoment() {
+                const d = this.activity?.dueDate || this.form.dueDate;
+                if (!d) return null;
+                const t = this.activity?.dueTime || this.form.dueTime || '23:59';
+                const m = new Date(d + 'T' + (t.length === 5 ? t + ':00' : t));
+                return isNaN(m.getTime()) ? null : m;
+            },
+            isPastDue() {
+                const m = this.dueMoment();
+                return m ? m.getTime() < Date.now() : false;
+            },
+            buckets() {
+                const by = this.submissionByStudent();
+                const pending = [];
+                const completed = [];
+                const pastDue = [];
+                const returned = [];
+                const seen = new Set();
+
+                this.studentList().forEach((s) => {
+                    const sid = this.studentId(s);
+                    if (!sid || seen.has(sid)) return;
+                    seen.add(sid);
+                    const sub = by[sid];
+                    const row = { student: s, submission: sub || null, label: (sub && sub.studentName) ? sub.studentName : this.studentLabel(s) };
+                    if (!sub) {
+                        if (this.isPastDue()) pastDue.push(row);
+                        else pending.push(row);
+                        return;
+                    }
+                    const st = (sub.status || '').toLowerCase();
+                    if (st === 'returned' || sub.returnedAt) returned.push(row);
+                    else if (st === 'submitted' || st === 'graded' || sub.submittedAt) completed.push(row);
+                    else pending.push(row);
+                });
+
+                // Submissions from students not listed on the class roster
+                Object.keys(by).forEach((sid) => {
+                    if (seen.has(sid)) return;
+                    const sub = by[sid];
+                    const st = (sub.status || '').toLowerCase();
+                    const row = { student: { uid: sid }, submission: sub, label: sub.studentName || sid };
+                    if (st === 'returned' || sub.returnedAt) returned.push(row);
+                    else completed.push(row);
+                });
+
+                return { pending, completed, pastDue, returned };
+            },
+
+            bucketMeta() {
+                return [
+                    { key: 'pending', title: 'Pending', empty: 'No pending students.', tone: 'slate' },
+                    { key: 'completed', title: 'Completed', empty: 'No completed submissions yet.', tone: 'emerald' },
+                    { key: 'pastDue', title: 'Past due', empty: 'No past-due students.', tone: 'rose' },
+                    { key: 'returned', title: 'Returned', empty: 'No returned work.', tone: 'sky' },
+                ];
+            },
+            openBucket(key) {
+                this.activeBucket = key;
+                this.bucketView = 'list';
+                this.reviewRow = null;
+            },
+            backToBuckets() {
+                this.bucketView = 'summary';
+                this.activeBucket = null;
+                this.reviewRow = null;
+            },
+            backToList() {
+                this.bucketView = 'list';
+                this.reviewRow = null;
+                this.reviewScore = '';
+                this.reviewFeedback = '';
+            },
+            openReview(row) {
+                if (!row?.submission) return;
+                this.reviewRow = row;
+                this.reviewScore = row.submission.score != null ? String(row.submission.score) : '';
+                this.reviewFeedback = row.submission.feedback || '';
+                this.bucketView = 'review';
+            },
+            quizQuestions() {
+                const q = this.activity?.quiz;
+                if (Array.isArray(q)) return q;
+                if (q && Array.isArray(q.questions)) return q.questions;
+                return [];
+            },
+            answerForQuestion(sub, q, index) {
+                const answers = sub && sub.answers;
+                if (!Array.isArray(answers) || !answers.length) return null;
+
+                // Mobile: { questionIndex: 0-based, order: 1-based, answer: "A"|"B"|... }
+                let hit = answers.find(function (a) {
+                    return a && Number(a.questionIndex) === Number(index);
+                });
+                if (hit) return hit.answer != null ? hit.answer : (hit.selected != null ? hit.selected : null);
+
+                hit = answers.find(function (a) {
+                    return a && Number(a.order) === Number(index) + 1;
+                });
+                if (hit) return hit.answer != null ? hit.answer : (hit.selected != null ? hit.selected : null);
+
+                if (q && q.order != null && Number(q.order) > 0) {
+                    const ord = Number(q.order);
+                    hit = answers.find(function (a) {
+                        return a && Number(a.order) === ord;
+                    });
+                    if (hit) return hit.answer != null ? hit.answer : (hit.selected != null ? hit.selected : null);
+                }
+
+                const pos = answers[index];
+                if (pos) return pos.answer != null ? pos.answer : (pos.selected != null ? pos.selected : null);
+
+                return null;
+            },
+            optionText(q, optionId) {
+                const opts = Array.isArray(q?.options) ? q.options : [];
+                const o = opts.find(x => String(x.id) === String(optionId) || String(x.text) === String(optionId));
+                if (!o) return optionId || '—';
+                const id = o.id != null ? String(o.id).toUpperCase() : '';
+                return id ? (id + '. ' + (o.text || '')) : (o.text || optionId);
+            },
+            correctOptionId(q) {
+                return q.correctOptionId || q.correctOption || q.correct || '';
+            },
+            async returnWork() {
+                if (!this.reviewRow?.submission?.id) return;
+                const score = Number(this.reviewScore);
+                if (Number.isNaN(score) || score < 0) {
+                    this.error = 'Enter a valid score.';
+                    return;
+                }
+                const max = Number(this.activity?.maxScore || this.form.maxScore || 0);
+                if (max > 0 && score > max) {
+                    this.error = 'Score cannot exceed max score (' + max + ').';
+                    return;
+                }
+                this.returning = true;
+                this.error = '';
+                this.message = '';
+                try {
+                    const updated = await window.TeacherClassroom.returnActivitySubmission(
+                        this.activityId,
+                        this.reviewRow.submission.id,
+                        { score, feedback: (this.reviewFeedback || '').trim() || null }
+                    );
+                    // refresh submissions list
+                    this.submissions = await window.TeacherClassroom.fetchActivitySubmissions(this.activityId);
+                    this.message = 'Returned to student with score ' + score + (max ? (' / ' + max) : '') + '.';
+                    this.backToBuckets();
+                } catch (e) {
+                    console.error(e);
+                    this.error = e.message || 'Could not return submission.';
+                } finally {
+                    this.returning = false;
+                }
+            },
+            async saveDetails() {
+                this.saving = true;
+                this.message = '';
+                this.error = '';
+                try {
+                    const patch = {
+                        title: (this.form.title || '').trim(),
+                        description: (this.form.description || '').trim(),
+                        dueDate: this.form.dueDate || '',
+                        dueTime: this.form.dueTime || '',
+                        maxScore: Number(this.form.maxScore) || 0,
+                    };
+                    if (!patch.title) throw new Error('Title is required.');
+                    await window.TeacherClassroom.updateClassActivity(this.activityId, patch);
+                    this.activity = { ...this.activity, ...patch };
+                    this.message = 'Details saved.';
+                } catch (e) {
+                    console.error(e);
+                    this.error = e.message || 'Save failed.';
+                } finally {
+                    this.saving = false;
+                }
+            },
+            async publish() {
+                if (!this.form.dueDate) {
+                    if (!confirm('No due date set. Publish anyway?')) return;
+                } else if (!confirm('Publish this lab? Students in the class will be able to complete it.')) {
+                    return;
+                }
+                this.publishing = true;
+                this.error = '';
+                this.message = '';
+                try {
+                    await this.saveDetails();
+                    const extra = {
+                        title: (this.form.title || '').trim(),
+                        description: (this.form.description || '').trim(),
+                        dueDate: this.form.dueDate || '',
+                        dueTime: this.form.dueTime || '',
+                        maxScore: Number(this.form.maxScore) || 0,
+                    };
+                    const res = await window.TeacherClassroom.publishClassActivity(this.activityId, extra);
+                    this.activity = { ...this.activity, ...res, ...extra };
+                    this.submissions = await window.TeacherClassroom.fetchActivitySubmissions(this.activityId);
+                    this.message = 'Published. Students can now take this lab.';
+                    this.panel = 'students';
+                } catch (e) {
+                    console.error(e);
+                    this.error = e.message || 'Publish failed.';
+                } finally {
+                    this.publishing = false;
+                }
+            },
+            async unpublish() {
+                if (!confirm('Unpublish? Students will no longer see this as an active assignment.')) return;
+                this.publishing = true;
+                this.error = '';
+                try {
+                    const res = await window.TeacherClassroom.unpublishClassActivity(this.activityId);
+                    this.activity = { ...this.activity, ...res };
+                    this.message = 'Moved back to draft.';
+                    this.panel = 'details';
+                } catch (e) {
+                    this.error = e.message || 'Unpublish failed.';
+                } finally {
+                    this.publishing = false;
+                }
+            },
+            formatWhen(v) {
+                if (!v) return '—';
+                try {
+                    if (v.toDate) return v.toDate().toLocaleString();
+                    if (v.seconds) return new Date(v.seconds * 1000).toLocaleString();
+                    return new Date(v).toLocaleString();
+                } catch { return String(v); }
+            },
+         };
+}
+</script>
+
 @endsection
 
 @push('scripts')
