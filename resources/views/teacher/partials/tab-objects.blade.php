@@ -28,7 +28,8 @@
     </div>
     <div x-show="error" class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800" x-text="error"></div>
 
-    <div x-show="!loading && !error" class="overflow-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div x-show="!loading && !error" class="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div class="flex min-w-full justify-center">
         <div class="inline-grid gap-1" style="grid-template-columns: repeat(18, minmax(2.75rem, 1fr));">
             <template x-for="cell in gridCells" :key="cell.key">
                 <div>
@@ -49,6 +50,7 @@
                     </template>
                 </div>
             </template>
+        </div>
         </div>
     </div>
 
