@@ -1,5 +1,5 @@
 {{-- Student AR lab previews — phone frame (9:16), no fullscreen --}}
-<section id="see-the-lab" class="relative overflow-hidden rounded-3xl border border-[#ABD2FA]/40 bg-white/90 px-4 py-14 shadow-sm sm:px-8 sm:py-16">
+<section id="see-the-lab" class="scroll-mt-24 relative overflow-hidden rounded-3xl border border-[#ABD2FA]/40 bg-white/90 px-4 py-14 shadow-sm sm:px-8 sm:py-16">
     <div class="relative mx-auto max-w-6xl">
         <div class="mx-auto max-w-2xl text-center">
             <span class="inline-flex items-center gap-1.5 rounded-full bg-[#ABD2FA]/25 px-3.5 py-1 text-xs font-semibold text-[#1B2CC1] ring-1 ring-inset ring-[#7692FF]/30">

@@ -1,5 +1,5 @@
 {{-- Why AR for chemistry labs --}}
-<section id="ar-lab" class="relative overflow-hidden rounded-3xl border border-[#091540]/10 bg-gradient-to-br from-[#091540] via-[#1B2CC1]/90 to-[#091540] px-4 py-14 text-white shadow-lg sm:px-8 sm:py-16">
+<section id="ar-lab" class="scroll-mt-24 relative overflow-hidden rounded-3xl border border-[#091540]/10 bg-gradient-to-br from-[#091540] via-[#1B2CC1]/90 to-[#091540] px-4 py-14 text-white shadow-lg sm:px-8 sm:py-16">
     <div class="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-[#7692FF]/20 blur-3xl"></div>
     <div class="relative mx-auto max-w-6xl">
         <div class="grid items-center gap-10 lg:grid-cols-2">

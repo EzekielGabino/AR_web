@@ -1,5 +1,5 @@
 {{-- What SciLens is + what teachers and students can do --}}
-<section id="overview" class="relative overflow-hidden rounded-3xl border border-[#ABD2FA]/40 bg-white/90 px-4 py-14 shadow-sm sm:px-8 sm:py-16">
+<section id="overview" class="scroll-mt-24 relative overflow-hidden rounded-3xl border border-[#ABD2FA]/40 bg-white/90 px-4 py-14 shadow-sm sm:px-8 sm:py-16">
     <div class="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#ABD2FA]/25 blur-3xl"></div>
     <div class="pointer-events-none absolute -bottom-16 -left-16 h-56 w-56 rounded-full bg-[#7692FF]/15 blur-3xl"></div>
 
