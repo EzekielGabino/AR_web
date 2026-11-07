@@ -561,6 +561,29 @@ class TeacherDataController extends Controller
             );
         }
 
+        // Unpublish: clear student submissions so work is not left half-published
+        if ($wasPublished && ! $nowPublished) {
+            $cleared = $this->clearActivitySubmissions($id);
+            $mapped['submissionsCleared'] = $cleared;
+            if (array_key_exists('published_at', $patch) || ! array_key_exists('published_at', $patch)) {
+                // Ensure published_at cleared when moving back to draft
+                try {
+                    $this->db->update('class_activities', 'id', $id, ['published_at' => null]);
+                    $mapped['publishedAt'] = null;
+                } catch (Throwable $e) {
+                    report($e);
+                }
+            }
+            $title = $mapped['title'] ?? 'Activity';
+            $this->notifyClassStudents(
+                $rows[0]['class_id'],
+                'activity_unpublished',
+                'Activity withdrawn',
+                $title.' is no longer assigned. Previous submissions were cleared.',
+                $id,
+            );
+        }
+
         return response()->json($mapped);
     }
 
@@ -1091,6 +1114,33 @@ protected function classLabel(string $classId): string
             'createdAt' => $r['created_at'] ?? null,
             'publishedAt' => $r['published_at'] ?? null,
         ];
+    }
+
+
+    /**
+     * Delete all submissions for an activity (used when unpublishing).
+     *
+     * @return int Number of rows cleared
+     */
+    protected function clearActivitySubmissions(string $activityId): int
+    {
+        $count = 0;
+        try {
+            $subs = $this->db->get('activity_submissions', [
+                'activity_id' => 'eq.'.$activityId,
+                'select' => 'id',
+            ]);
+            foreach ($subs as $s) {
+                if (! empty($s['id'])) {
+                    $this->db->delete('activity_submissions', 'id', $s['id']);
+                    $count++;
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $count;
     }
 
     protected function mapTemplate(array $r): array

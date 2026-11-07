@@ -36,7 +36,7 @@
                         class="cursor-pointer rounded-xl bg-[#1B2CC1] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#091540] disabled:opacity-50 transition-colors">
                         <span x-text="publishing ? 'Publishing…' : 'Publish for students'"></span>
                     </button>
-                    <button type="button" x-show="isPublished()" @click="unpublish()" :disabled="publishing"
+                    <button type="button" x-show="isPublished()" @click="unpublishModalOpen = true" :disabled="publishing"
                         class="cursor-pointer rounded-xl border-[1.5px] border-[#ABD2FA] bg-white px-5 py-2.5 text-xs font-bold text-[#091540] hover:bg-[#ABD2FA]/20 disabled:opacity-50 transition-colors">
                         Unpublish
                     </button>
@@ -380,6 +380,7 @@ function activityShowPage(config) {
             form: { title: '', description: '', dueDate: '', dueTime: '', maxScore: 0 },
             publishModalOpen: false,
             publishNoDueConfirm: false,
+            unpublishModalOpen: false,
             // Students bucket UI
             bucketView: 'summary', // summary | list | review
             activeBucket: null,
@@ -738,13 +739,19 @@ function activityShowPage(config) {
                 }
             },
             async unpublish() {
-                if (!confirm('Unpublish? Students will no longer see this as an active assignment.')) return;
                 this.publishing = true;
                 this.error = '';
                 try {
                     const res = await window.TeacherClassroom.unpublishClassActivity(this.activityId);
-                    this.activity = { ...this.activity, ...res };
-                    this.message = 'Moved back to draft.';
+                    this.activity = Object.assign({}, this.activity, res, { published: false, status: 'draft', publishedAt: null });
+                    this.submissions = [];
+                    this.bucketView = 'summary';
+                    this.reviewRow = null;
+                    this.unpublishModalOpen = false;
+                    const n = res && res.submissionsCleared != null ? res.submissionsCleared : null;
+                    this.message = n != null
+                        ? ('Moved back to draft. ' + n + ' submission(s) cleared — students must submit again after re-publish.')
+                        : 'Moved back to draft. Student submissions were cleared.';
                     this.panel = 'details';
                 } catch (e) {
                     this.error = e.message || 'Unpublish failed.';
@@ -767,6 +774,31 @@ function activityShowPage(config) {
 @endsection
 
 @push('scripts')
+
+    
+    {{-- Unpublish confirmation modal --}}
+    <div x-show="unpublishModalOpen" x-cloak
+        class="fixed inset-0 z-[300] flex items-center justify-center bg-[#091540]/70 p-4 backdrop-blur-sm"
+        role="dialog" aria-modal="true">
+        <div class="absolute inset-0" @click="!publishing && (unpublishModalOpen = false)"></div>
+        <div class="relative w-full max-w-md rounded-3xl border border-rose-200 bg-white p-6 shadow-2xl" @click.stop>
+            <h3 class="text-lg font-extrabold text-[#091540]">Unpublish activity?</h3>
+            <p class="mt-2 text-sm font-medium text-[#091540]/75">
+                Students will no longer see this as an active assignment.
+            </p>
+            <div class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-900">
+                All student submissions for this activity will be cleared (including returned work and scores).
+                After you publish again, students must complete and submit the activity from the start.
+            </div>
+            <div class="mt-5 flex flex-wrap justify-end gap-2">
+                <button type="button" @click="unpublishModalOpen = false" :disabled="publishing"
+                    class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold text-[#091540] disabled:opacity-50">Cancel</button>
+                <button type="button" @click="unpublish()" :disabled="publishing"
+                    class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 disabled:opacity-50"
+                    x-text="publishing ? 'Unpublishing…' : 'Unpublish and clear submissions'"></button>
+            </div>
+        </div>
+    </div>
 
     {{-- Publish confirmation modal --}}
     <div x-show="publishModalOpen" x-cloak

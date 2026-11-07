@@ -185,6 +185,7 @@ export async function unpublishClassActivity(activityId) {
         body: JSON.stringify({
             published: false,
             status: "draft",
+            publishedAt: null,
         }),
     });
 }
