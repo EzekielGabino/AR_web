@@ -147,36 +147,30 @@ class AdminDataController extends Controller
 
         $data = $request->validate([
             'email' => 'required|email',
-            'password' => 'nullable|string|min:6',
-            'display_name' => 'nullable|string|max:120',
             'existing_user_id' => 'nullable|string',
         ]);
 
         $userId = $data['existing_user_id'] ?? null;
+        $profile = null;
 
         if (! $userId) {
-            // Find existing profile by email
+            // Students sign in with Google — only enroll an existing profile
             $byEmail = $this->db->get('profiles', [
                 'email' => 'eq.'.$data['email'],
                 'limit' => 1,
             ]);
-            if ($byEmail) {
-                $userId = $byEmail[0]['id'];
-            } else {
-                if (empty($data['password'])) {
-                    return response()->json(['message' => 'Password is required when creating a new student.'], 422);
-                }
-                $created = $this->createUser(new Request([
-                    'email' => $data['email'],
-                    'password' => $data['password'],
-                    'display_name' => $data['display_name'] ?? $data['email'],
-                    'role' => 'student',
-                ]));
-                $payload = $created->getData(true);
-                if (($created->status() ?? 500) >= 400) {
-                    return $created;
-                }
-                $userId = $payload['id'] ?? null;
+            if (! $byEmail) {
+                return response()->json([
+                    'message' => 'No account found for that email. Students must sign in once with Google on the mobile app before they can be added to a class.',
+                ], 422);
+            }
+            $profile = $byEmail[0];
+            $userId = $profile['id'] ?? null;
+        } else {
+            $rows = $this->db->get('profiles', ['id' => 'eq.'.$userId, 'limit' => 1]);
+            $profile = $rows[0] ?? null;
+            if (! $profile) {
+                return response()->json(['message' => 'User not found.'], 404);
             }
         }
 

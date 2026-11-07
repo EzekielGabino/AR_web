@@ -27,6 +27,7 @@
                     </div>
                     <p class="mt-1 text-xs text-slate-500">
                         <span x-text="activity.labCategory || 'Lab'"></span>
+                        <span x-show="activity.publishedAt"> · Published <span x-text="formatPublishedDate(activity.publishedAt)"></span></span>
                         <span x-show="activity.dueDate"> · Due <span x-text="activity.dueDate"></span><span x-show="activity.dueTime" x-text="' ' + activity.dueTime"></span></span>
                     </p>
                 </div>
@@ -86,7 +87,7 @@
                         </div>
                     </div>
                     <div class="mt-6 flex justify-end">
-                        <button type="button" @click="saveDetails()" :disabled="saving"
+                        <button type="button" @click="saveDetails()" :disabled="saving || isPublished()" :disabled="saving"
                             class="cursor-pointer rounded-xl bg-[#1B2CC1] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#091540] disabled:opacity-50 transition-colors">
                             <span x-text="saving ? 'Saving…' : 'Save details'"></span>
                         </button>
@@ -377,6 +378,8 @@ function activityShowPage(config) {
             submissions: [],
             panel: 'details',
             form: { title: '', description: '', dueDate: '', dueTime: '', maxScore: 0 },
+            publishModalOpen: false,
+            publishNoDueConfirm: false,
             // Students bucket UI
             bucketView: 'summary', // summary | list | review
             activeBucket: null,
@@ -567,11 +570,33 @@ function activityShowPage(config) {
                 this.reviewFeedback = '';
             },
             openReview(row) {
-                if (!row?.submission) return;
+                if (!row || !row.submission) return;
                 this.reviewRow = row;
-                this.reviewScore = row.submission.score != null ? String(row.submission.score) : '';
+                const auto = this.computeAutoScore(row.submission);
+                this.reviewScore = row.submission.score != null && row.submission.score !== ''
+                    ? String(row.submission.score)
+                    : String(auto);
                 this.reviewFeedback = row.submission.feedback || '';
                 this.bucketView = 'review';
+            },
+            derivedMaxScore() {
+                const n = this.quizQuestions().length;
+                if (n > 0) return n;
+                return Number(this.activity && this.activity.maxScore != null ? this.activity.maxScore : (this.form.maxScore || 0)) || 0;
+            },
+            computeAutoScore(sub) {
+                const questions = this.quizQuestions();
+                let score = 0;
+                for (let i = 0; i < questions.length; i++) {
+                    const q = questions[i];
+                    const ans = this.answerForQuestion(sub, q, i);
+                    const correct = this.correctOptionId(q);
+                    if (ans == null || correct == null || correct === '') continue;
+                    if (String(ans).trim().toUpperCase() === String(correct).trim().toUpperCase()) {
+                        score += 1;
+                    }
+                }
+                return score;
             },
             quizQuestions() {
                 const q = this.activity?.quiz;
@@ -624,7 +649,7 @@ function activityShowPage(config) {
                     this.error = 'Enter a valid score.';
                     return;
                 }
-                const max = Number(this.activity?.maxScore || this.form.maxScore || 0);
+                const max = Number(this.derivedMaxScore());
                 if (max > 0 && score > max) {
                     this.error = 'Score cannot exceed max score (' + max + ').';
                     return;
@@ -650,6 +675,10 @@ function activityShowPage(config) {
                 }
             },
             async saveDetails() {
+                if (this.isPublished()) {
+                    this.error = 'Published activities cannot be edited. Unpublish first.';
+                    return;
+                }
                 this.saving = true;
                 this.message = '';
                 this.error = '';
@@ -659,11 +688,12 @@ function activityShowPage(config) {
                         description: (this.form.description || '').trim(),
                         dueDate: this.form.dueDate || '',
                         dueTime: this.form.dueTime || '',
-                        maxScore: Number(this.form.maxScore) || 0,
+                        maxScore: this.derivedMaxScore(),
                     };
                     if (!patch.title) throw new Error('Title is required.');
                     await window.TeacherClassroom.updateClassActivity(this.activityId, patch);
-                    this.activity = { ...this.activity, ...patch };
+                    this.activity = Object.assign({}, this.activity, patch);
+                    this.form.maxScore = patch.maxScore;
                     this.message = 'Details saved.';
                 } catch (e) {
                     console.error(e);
@@ -672,27 +702,32 @@ function activityShowPage(config) {
                     this.saving = false;
                 }
             },
+            openPublishModal() {
+                this.publishNoDueConfirm = !this.form.dueDate;
+                this.publishModalOpen = true;
+            },
+            closePublishModal() {
+                this.publishModalOpen = false;
+            },
             async publish() {
-                if (!this.form.dueDate) {
-                    if (!confirm('No due date set. Publish anyway?')) return;
-                } else if (!confirm('Publish this lab? Students in the class will be able to complete it.')) {
-                    return;
-                }
                 this.publishing = true;
                 this.error = '';
                 this.message = '';
                 try {
+                    // Lock max score to quiz length before publish
+                    this.form.maxScore = this.derivedMaxScore();
                     await this.saveDetails();
                     const extra = {
                         title: (this.form.title || '').trim(),
                         description: (this.form.description || '').trim(),
                         dueDate: this.form.dueDate || '',
                         dueTime: this.form.dueTime || '',
-                        maxScore: Number(this.form.maxScore) || 0,
+                        maxScore: this.derivedMaxScore(),
                     };
                     const res = await window.TeacherClassroom.publishClassActivity(this.activityId, extra);
-                    this.activity = { ...this.activity, ...res, ...extra };
+                    this.activity = Object.assign({}, this.activity, res, extra);
                     this.submissions = await window.TeacherClassroom.fetchActivitySubmissions(this.activityId);
+                    this.publishModalOpen = false;
                     this.message = 'Published. Students can now take this lab.';
                     this.panel = 'students';
                 } catch (e) {
@@ -732,5 +767,33 @@ function activityShowPage(config) {
 @endsection
 
 @push('scripts')
+
+    {{-- Publish confirmation modal --}}
+    <div x-show="publishModalOpen" x-cloak
+        class="fixed inset-0 z-[300] flex items-center justify-center bg-[#091540]/70 p-4 backdrop-blur-sm"
+        role="dialog" aria-modal="true">
+        <div class="absolute inset-0" @click="closePublishModal()"></div>
+        <div class="relative w-full max-w-md rounded-3xl border border-[#7692FF]/40 bg-white p-6 shadow-2xl" @click.stop>
+            <h3 class="text-lg font-extrabold text-[#091540]">Publish activity?</h3>
+            <p class="mt-2 text-sm font-medium text-[#091540]/75">
+                Students in this class will see this assignment and can submit work.
+            </p>
+            <div class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
+                While published, you cannot edit or delete this activity (content, attachments, or details).
+                Unpublish first if you need to change it.
+            </div>
+            <p x-show="publishNoDueConfirm" class="mt-3 text-xs font-bold text-amber-800">
+                No due date is set. You can still publish without a deadline.
+            </p>
+            <div class="mt-5 flex flex-wrap justify-end gap-2">
+                <button type="button" @click="closePublishModal()" :disabled="publishing"
+                    class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold text-[#091540] disabled:opacity-50">Cancel</button>
+                <button type="button" @click="publish()" :disabled="publishing"
+                    class="rounded-xl bg-[#1B2CC1] px-4 py-2 text-xs font-bold text-white shadow disabled:opacity-50"
+                    x-text="publishing ? 'Publishing…' : 'Publish for students'"></button>
+            </div>
+        </div>
+    </div>
+
 <script type="module" src="{{ asset('js/teacher/classroom.js') }}"></script>
 @endpush

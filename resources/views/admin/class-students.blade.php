@@ -64,16 +64,10 @@
         <div class="absolute inset-0" @click="addOpen = false"></div>
         <div class="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl" @click.stop>
             <h3 class="text-lg font-extrabold">Add student to class</h3>
-            <p class="mt-1 text-xs text-slate-500">Uses an existing account if the email is already registered; otherwise creates a new student.</p>
+            <p class="mt-1 text-xs text-slate-500">Students use Google sign-in. Enter the Google email of a student who has already opened the mobile app once.</p>
             <div class="mt-4 space-y-3">
-                <label class="block text-xs font-bold">Display name
-                    <input type="text" x-model="addForm.display_name" class="mt-1 w-full rounded-xl border border-[#ABD2FA] px-3 py-2 text-xs font-semibold">
-                </label>
-                <label class="block text-xs font-bold">Email
-                    <input type="email" x-model="addForm.email" class="mt-1 w-full rounded-xl border border-[#ABD2FA] px-3 py-2 text-xs font-semibold">
-                </label>
-                <label class="block text-xs font-bold">Password (required only for new accounts)
-                    <input type="text" x-model="addForm.password" class="mt-1 w-full rounded-xl border border-[#ABD2FA] px-3 py-2 text-xs font-semibold">
+                <label class="block text-xs font-bold">Student Google email
+                    <input type="email" x-model="addForm.email" class="mt-1 w-full rounded-xl border border-[#ABD2FA] px-3 py-2 text-xs font-semibold" placeholder="student@gmail.com">
                 </label>
                 <p x-show="addError" x-text="addError" class="text-xs font-bold text-rose-600"></p>
             </div>
@@ -99,7 +93,7 @@ function adminClassStudents() {
         addOpen: false,
         adding: false,
         addError: '',
-        addForm: { email: '', password: '', display_name: '' },
+        addForm: { email: '' },
         async init() {
             while (!window.AdminApi) await new Promise(r => setTimeout(r, 40));
             await this.reload();
@@ -118,7 +112,7 @@ function adminClassStudents() {
         },
         openAdd() {
             this.addError = '';
-            this.addForm = { email: '', password: '', display_name: '' };
+            this.addForm = { email: '' };
             this.addOpen = true;
         },
         async submitAdd() {

@@ -37,22 +37,26 @@
             <div x-show="loadingTeachers" class="rounded-2xl border bg-white p-6 text-center text-xs text-slate-500">Loading…</div>
             <div class="space-y-2">
                 <template x-for="u in teachers" :key="u.id">
-                    <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ABD2FA]/50 bg-white p-4">
-                        <a :href="'{{ url('/admin/teachers') }}/' + u.id" class="min-w-0 hover:underline">
-                            <p class="text-sm font-black" x-text="u.display_name"></p>
-                            <p class="text-xs text-slate-500" x-text="u.email"></p>
-                            <p class="text-[11px] font-bold text-[#1B2CC1]" x-text="(u.class_count || 0) + ' class(es)'"></p>
-                        </a>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <select class="rounded-xl border border-[#ABD2FA] px-2 py-1.5 text-xs font-bold"
-                                :value="u.role"
-                                @change="changeRole(u, $event.target.value)">
-                                <option value="teacher">teacher</option>
-                                <option value="educator">educator</option>
-                                <option value="student">student</option>
-                                <option value="admin">admin</option>
-                            </select>
-                            <button type="button" @click="removeUser(u)" class="rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600">Delete</button>
+                    <div class="relative rounded-2xl border border-[#ABD2FA]/50 bg-white p-4 shadow-sm transition hover:border-[#1B2CC1] hover:shadow-md">
+                        <a :href="'{{ url('/admin/teachers') }}/' + u.id" class="absolute inset-0 z-0 rounded-2xl" :aria-label="'Open ' + (u.display_name || 'teacher')"></a>
+                        <div class="relative z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+                            <div class="min-w-0">
+                                <p class="text-sm font-black" x-text="u.display_name"></p>
+                                <p class="text-xs text-slate-500" x-text="u.email"></p>
+                                <p class="text-[11px] font-bold text-[#1B2CC1]" x-text="(u.class_count || 0) + ' class(es)'"></p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2 pointer-events-auto">
+                                <select class="rounded-xl border border-[#ABD2FA] px-2 py-1.5 text-xs font-bold"
+                                    :value="u.role"
+                                    @click.stop
+                                    @change="changeRole(u, $event.target.value)">
+                                    <option value="teacher">teacher</option>
+                                    <option value="educator">educator</option>
+                                    <option value="student">student</option>
+                                    <option value="admin">admin</option>
+                                </select>
+                                <button type="button" @click.stop="removeUser(u)" class="rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600">Delete</button>
+                            </div>
                         </div>
                     </div>
                 </template>

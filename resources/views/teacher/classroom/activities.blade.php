@@ -36,10 +36,12 @@
                             x-text="isPublished(act) ? 'Published' : 'Draft'"></span>
                     </div>
                     <p class="mt-1 text-xs text-[#091540]/70 font-medium">
+                        <span x-show="act.publishedAt || act.published_at">Published <span x-text="formatPublished(act)"></span></span>
+                        <span x-show="(act.publishedAt || act.published_at) && act.dueDate"> · </span>
                         <span x-show="act.dueDate">Due <span x-text="act.dueDate"></span><span x-show="act.dueTime" x-text="' ' + act.dueTime"></span></span>
-                        <span x-show="!act.dueDate">No deadline set</span>
+                        <span x-show="!act.dueDate && !(act.publishedAt || act.published_at)">No deadline set</span>
                         <span> · </span>
-                        <span x-text="(act.quiz?.questions?.length || 0) + ' quiz questions'"></span>
+                        <span x-text="(act.quiz?.questions?.length || act.quiz?.length || 0) + ' quiz questions'"></span>
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2" x-show="!isPublished(act)" @click.stop>
@@ -79,6 +81,7 @@
                     </div>
                     <p class="mt-1 text-xs text-[#091540]/70 font-medium">
                         <span x-text="act.labCategory || 'lab'"></span>
+                        <span x-show="act.publishedAt || act.published_at"> · Published <span x-text="formatPublished(act)"></span></span>
                         <span x-show="act.dueDate"> · Due <span x-text="act.dueDate"></span><span x-show="act.dueTime" x-text="' ' + act.dueTime"></span></span>
                         <span x-show="!act.dueDate && !isPublished(act)"> · No deadline set</span>
                     </p>

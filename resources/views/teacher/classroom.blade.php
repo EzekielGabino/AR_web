@@ -494,6 +494,17 @@
                 if (this.tplModal === 'edit-lab') return 'Edit overview, apparatus, elements, steps, and quiz for this class draft. Assignment deadline is set on the activity page.';
                 return '';
             },
+            formatPublished(act) {
+                const v = act?.publishedAt || act?.published_at;
+                if (!v) return '—';
+                try {
+                    const d = new Date(v);
+                    if (Number.isNaN(d.getTime())) return String(v).slice(0, 10);
+                    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                } catch (e) {
+                    return String(v).slice(0, 10);
+                }
+            },
             isPublished(act) {
                 return act && (act.published === true || act.status === 'published');
             },
