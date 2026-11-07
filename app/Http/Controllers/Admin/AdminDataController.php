@@ -106,7 +106,7 @@ class AdminDataController extends Controller
 
         $members = $this->db->get('class_members', [
             'class_id' => 'eq.'.$classId,
-            'select' => 'user_id,role,status,joined_at,profiles(id,display_name,email,photo_url)',
+            'select' => 'user_id,role,status,joined_at,profiles(id,display_name,email,photo_url,role)',
             'order' => 'joined_at.desc',
         ]);
 
@@ -127,6 +127,7 @@ class AdminDataController extends Controller
                 'display_name' => is_array($prof) ? ($prof['display_name'] ?? 'Student') : 'Student',
                 'email' => is_array($prof) ? ($prof['email'] ?? '') : '',
                 'photo_url' => is_array($prof) ? ($prof['photo_url'] ?? null) : null,
+                'role' => is_array($prof) ? ($prof['role'] ?? 'student') : 'student',
             ];
         }
 
@@ -134,6 +135,93 @@ class AdminDataController extends Controller
             'class' => $class,
             'students' => $students,
         ]);
+    }
+
+
+    public function addClassStudent(Request $request, string $classId)
+    {
+        $classes = $this->db->get('classes', ['id' => 'eq.'.$classId, 'limit' => 1]);
+        if (! $classes) {
+            return response()->json(['message' => 'Class not found.'], 404);
+        }
+
+        $data = $request->validate([
+            'email' => 'required|email',
+            'password' => 'nullable|string|min:6',
+            'display_name' => 'nullable|string|max:120',
+            'existing_user_id' => 'nullable|string',
+        ]);
+
+        $userId = $data['existing_user_id'] ?? null;
+
+        if (! $userId) {
+            // Find existing profile by email
+            $byEmail = $this->db->get('profiles', [
+                'email' => 'eq.'.$data['email'],
+                'limit' => 1,
+            ]);
+            if ($byEmail) {
+                $userId = $byEmail[0]['id'];
+            } else {
+                if (empty($data['password'])) {
+                    return response()->json(['message' => 'Password is required when creating a new student.'], 422);
+                }
+                $created = $this->createUser(new Request([
+                    'email' => $data['email'],
+                    'password' => $data['password'],
+                    'display_name' => $data['display_name'] ?? $data['email'],
+                    'role' => 'student',
+                ]));
+                $payload = $created->getData(true);
+                if (($created->status() ?? 500) >= 400) {
+                    return $created;
+                }
+                $userId = $payload['id'] ?? null;
+            }
+        }
+
+        if (! $userId) {
+            return response()->json(['message' => 'Could not resolve user.'], 500);
+        }
+
+        // Ensure role student if they were something else? Keep existing role unless new.
+        $existingMembers = $this->db->get('class_members', [
+            'class_id' => 'eq.'.$classId,
+            'user_id' => 'eq.'.$userId,
+            'limit' => 1,
+        ]);
+        if ($existingMembers) {
+            $this->db->update('class_members', 'id', $existingMembers[0]['id'], [
+                'status' => 'approved',
+                'role' => 'student',
+            ]);
+        } else {
+            $this->db->insert('class_members', [
+                'class_id' => $classId,
+                'user_id' => $userId,
+                'role' => 'student',
+                'status' => 'approved',
+                'joined_at' => now()->toIso8601String(),
+            ]);
+        }
+
+        return $this->classStudents($classId);
+    }
+
+    public function removeClassStudent(string $classId, string $userId)
+    {
+        $members = $this->db->get('class_members', [
+            'class_id' => 'eq.'.$classId,
+            'user_id' => 'eq.'.$userId,
+            'select' => 'id',
+        ]);
+        foreach ($members as $m) {
+            if (! empty($m['id'])) {
+                $this->db->delete('class_members', 'id', $m['id']);
+            }
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     // -------------------------------------------------------------------------

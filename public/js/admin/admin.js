@@ -45,6 +45,17 @@ export async function deleteUser(id) {
 export async function classStudents(classId) {
     return api('/api/admin/classes/' + encodeURIComponent(classId) + '/students');
 }
+export async function addClassStudent(classId, body) {
+    return api('/api/admin/classes/' + encodeURIComponent(classId) + '/students', {
+        method: 'POST',
+        body: JSON.stringify(body),
+    });
+}
+export async function removeClassStudent(classId, userId) {
+    return api('/api/admin/classes/' + encodeURIComponent(classId) + '/students/' + encodeURIComponent(userId), {
+        method: 'DELETE',
+    });
+}
 export async function listTemplates() {
     return api('/api/admin/lab-templates');
 }
@@ -72,6 +83,8 @@ window.AdminApi = {
     updateUserRole,
     deleteUser,
     classStudents,
+    addClassStudent,
+    removeClassStudent,
     listTemplates,
     showTemplate,
     createTemplate,

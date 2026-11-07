@@ -55,11 +55,11 @@
                     </label>
                 </div>
 
-                {{-- Apparatus --}}
+                {{-- Apparatus (same catalog as teacher lab editor) --}}
                 <div x-show="section === 'apparatus'" class="space-y-3">
                     <div class="flex justify-between items-center">
                         <p class="text-xs font-bold text-[#1B2CC1]">Apparatus list</p>
-                        <button type="button" @click="form.apparatus.push({ key: '', displayName: '', maxVol: 50 })"
+                        <button type="button" @click="addApparatus()"
                             class="rounded-xl bg-[#ABD2FA]/30 px-3 py-1.5 text-xs font-bold text-[#1B2CC1]">+ Add</button>
                     </div>
                     <template x-for="(a, i) in form.apparatus" :key="i">
@@ -68,10 +68,18 @@
                                 <span class="text-[10px] font-bold text-slate-400" x-text="'#' + (i+1)"></span>
                                 <button type="button" @click="form.apparatus.splice(i,1)" class="text-xs font-bold text-rose-500">Remove</button>
                             </div>
-                            <input type="text" x-model="a.displayName" placeholder="Display name (e.g. Beaker)" class="w-full rounded-lg border border-[#ABD2FA] px-2 py-1.5 text-xs font-semibold">
-                            <input type="text" x-model="a.key" placeholder="Key (e.g. beaker)" class="w-full rounded-lg border border-[#ABD2FA] px-2 py-1.5 text-xs font-semibold">
+                            <label class="block text-[10px] font-bold text-slate-500">Type
+                                <select class="mt-0.5 w-full rounded-lg border border-[#ABD2FA] px-2 py-1.5 text-xs font-semibold"
+                                    :value="a.key"
+                                    @change="onApparatusKeyChange(a, $event.target.value)">
+                                    <template x-for="c in apparatusCatalog" :key="c.key">
+                                        <option :value="c.key" x-text="c.displayName" :selected="a.key === c.key"></option>
+                                    </template>
+                                </select>
+                            </label>
+                            <p class="text-[11px] text-slate-500">Key: <span class="font-mono font-bold" x-text="a.key"></span></p>
                             <label class="block text-[10px] font-bold text-slate-500">Max volume
-                                <input type="number" x-model.number="a.maxVol" min="1" class="mt-0.5 w-full rounded-lg border border-[#ABD2FA] px-2 py-1.5 text-xs font-semibold">
+                                <input type="number" x-model.number="a.maxVol" min="0" class="mt-0.5 w-full rounded-lg border border-[#ABD2FA] px-2 py-1.5 text-xs font-semibold">
                             </label>
                         </div>
                     </template>
@@ -198,6 +206,14 @@ function adminTemplateEdit() {
         saving: false,
         error: '',
         message: '',
+        apparatusCatalog: [
+            { key: 'beaker', displayName: 'Beaker', defaultMaxVol: 250 },
+            { key: 'test_tube', displayName: 'Test Tube', defaultMaxVol: 50 },
+            { key: 'test_tube_rack', displayName: 'Test Tube Rack', defaultMaxVol: 6 },
+            { key: 'stirring_rod', displayName: 'Stirring Rod', defaultMaxVol: 0 },
+            { key: 'conical_flask', displayName: 'Conical Flask', defaultMaxVol: 250 },
+            { key: 'pipette', displayName: 'Pipette', defaultMaxVol: 10 },
+        ],
         form: {
             id: null,
             title: '',
@@ -231,6 +247,22 @@ function adminTemplateEdit() {
             } finally {
                 this.loading = false;
             }
+        },
+        addApparatus() {
+            const used = new Set((this.form.apparatus || []).map((a) => a.key));
+            const pick = this.apparatusCatalog.find((c) => !used.has(c.key)) || this.apparatusCatalog[0];
+            this.form.apparatus.push({
+                key: pick.key,
+                displayName: pick.displayName,
+                maxVol: pick.defaultMaxVol,
+            });
+        },
+        onApparatusKeyChange(a, key) {
+            const cat = this.apparatusCatalog.find((c) => c.key === key);
+            if (!cat) return;
+            a.key = cat.key;
+            a.displayName = cat.displayName;
+            if (a.maxVol == null || a.maxVol === '') a.maxVol = cat.defaultMaxVol;
         },
         renumberSteps() {
             this.form.steps.forEach((s, i) => { s.order = i + 1; });

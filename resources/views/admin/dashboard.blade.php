@@ -14,7 +14,7 @@
         </div>
 
         <nav class="flex flex-wrap gap-2">
-            <template x-for="t in ['teachers','students','templates']" :key="t">
+            <template x-for="t in ['teachers','templates']" :key="t">
                 <button type="button" @click="tab = t"
                     class="rounded-2xl px-4 py-2.5 text-xs font-bold capitalize transition"
                     :class="tab === t ? 'bg-[#1B2CC1] text-white shadow' : 'bg-white border border-[#ABD2FA] text-[#091540]/70'"
@@ -59,39 +59,7 @@
             </div>
         </div>
 
-        {{-- Students --}}
-        <div x-show="tab === 'students'" class="space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <h2 class="text-lg font-black">Students</h2>
-                <div class="flex gap-2">
-                    <button type="button" @click="loadStudents()" class="text-xs font-bold text-[#1B2CC1]">Refresh</button>
-                    <button type="button" @click="openCreateUser('student')" class="rounded-xl bg-[#1B2CC1] px-4 py-2 text-xs font-bold text-white">+ Add student</button>
-                </div>
-            </div>
-            <div x-show="loadingStudents" class="rounded-2xl border bg-white p-6 text-center text-xs text-slate-500">Loading…</div>
-            <div class="space-y-2">
-                <template x-for="u in students" :key="u.id">
-                    <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ABD2FA]/50 bg-white p-4">
-                        <div class="min-w-0">
-                            <p class="text-sm font-black" x-text="u.display_name"></p>
-                            <p class="text-xs text-slate-500" x-text="u.email"></p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <select class="rounded-xl border border-[#ABD2FA] px-2 py-1.5 text-xs font-bold"
-                                :value="u.role"
-                                @change="changeRole(u, $event.target.value)">
-                                <option value="student">student</option>
-                                <option value="teacher">teacher</option>
-                                <option value="educator">educator</option>
-                                <option value="admin">admin</option>
-                            </select>
-                            <button type="button" @click="removeUser(u)" class="rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600">Delete</button>
-                        </div>
-                    </div>
-                </template>
-            </div>
-            <p x-show="!loadingStudents && !students.length" class="text-xs text-slate-500">No student profiles yet.</p>
-        </div>
+        
 
         {{-- Templates --}}
         <div x-show="tab === 'templates'" class="space-y-4">
@@ -168,7 +136,7 @@
 function adminDashboard() {
     const tabParam = new URLSearchParams(window.location.search).get('tab') || 'teachers';
     return {
-        tab: ['teachers','students','templates'].includes(tabParam) ? tabParam : 'teachers',
+        tab: tabParam === 'templates' ? 'templates' : 'teachers',
         teachers: [],
         students: [],
         templates: [],
@@ -188,7 +156,6 @@ function adminDashboard() {
             else await this.loadTeachers();
             this.$watch('tab', (v) => {
                 if (v === 'teachers' && !this.teachers.length) this.loadTeachers();
-                if (v === 'students' && !this.students.length) this.loadStudents();
                 if (v === 'templates' && !this.templates.length) this.loadTemplates();
             });
         },
@@ -221,8 +188,7 @@ function adminDashboard() {
                 await window.AdminApi.createUser(this.userForm);
                 this.message = 'User created.';
                 this.userModal = false;
-                if (this.userForm.role === 'student') await this.loadStudents();
-                else await this.loadTeachers();
+                await this.loadTeachers();
             } catch (e) {
                 this.userError = e.message || 'Create failed.';
             } finally {
@@ -239,7 +205,6 @@ function adminDashboard() {
                 await window.AdminApi.updateUserRole(u.id, { role });
                 this.message = 'Role updated.';
                 await this.loadTeachers();
-                await this.loadStudents();
             } catch (e) {
                 this.error = e.message || 'Role update failed.';
                 await this.loadTeachers(); await this.loadStudents();
@@ -251,7 +216,6 @@ function adminDashboard() {
                 await window.AdminApi.deleteUser(u.id);
                 this.message = 'User deleted.';
                 await this.loadTeachers();
-                await this.loadStudents();
             } catch (e) {
                 this.error = e.message || 'Delete failed.';
             }

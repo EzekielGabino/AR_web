@@ -88,6 +88,8 @@ Route::middleware([EnsureFirebaseSessionIsValid::class])->group(function () {
             Route::patch('/users/{id}/role', [AdminDataController::class, 'updateUserRole']);
             Route::delete('/users/{id}', [AdminDataController::class, 'deleteUser']);
             Route::get('/classes/{classId}/students', [AdminDataController::class, 'classStudents']);
+            Route::post('/classes/{classId}/students', [AdminDataController::class, 'addClassStudent']);
+            Route::delete('/classes/{classId}/students/{userId}', [AdminDataController::class, 'removeClassStudent']);
             Route::get('/lab-templates', [AdminDataController::class, 'listTemplates']);
             Route::get('/lab-templates/{id}', [AdminDataController::class, 'showTemplate']);
             Route::post('/lab-templates', [AdminDataController::class, 'createTemplate']);
