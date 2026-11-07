@@ -12,7 +12,10 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SketchfabController;
 use App\Http\Controllers\Teacher\TeacherDataController;
 use App\Http\Middleware\EnsureFirebaseSessionIsValid;
+use App\Http\Middleware\EnsureAdminRole;
+use App\Http\Middleware\EnsureTeacherRole;
 use App\Http\Middleware\RedirectIfFirebaseAuthenticated;
+use App\Http\Controllers\Admin\AdminDataController;
 
 /*
 |--------------------------------------------------------------------------
@@ -57,83 +60,99 @@ Route::post('/auth/set-password', [SupabaseAuthController::class, 'setPassword']
 Route::post('/auth/set-password/skip', [SupabaseAuthController::class, 'skipPasswordSetup'])->name('auth.set-password.skip');
 
 // ---------------------------------------------------------------------
-// Authenticated teacher area
+// Authenticated area (session required)
 // ---------------------------------------------------------------------
 Route::middleware([EnsureFirebaseSessionIsValid::class])->group(function () {
 
-    Route::get('/dashboard', fn () => view('teacher.dashboard'))->name('dashboard');
+    // Admin portal (pages + /api/admin/*)
+    Route::middleware([EnsureAdminRole::class])->group(function () {
+        Route::prefix('admin')->name('admin.')->group(function () {
+            Route::get('/', fn () => view('admin.dashboard'))->name('dashboard');
+            Route::get('/teachers/{teacherId}', fn ($teacherId) => view('admin.teacher-show', ['teacherId' => $teacherId]))
+                ->name('teachers.show')
+                ->where('teacherId', '[A-Za-z0-9\-]+');
+            Route::get('/classes/{classId}/students', fn ($classId) => view('admin.class-students', ['classId' => $classId]))
+                ->name('classes.students')
+                ->where('classId', '[A-Za-z0-9\-]+');
+        });
 
-    // Step 5 — teacher data API (Supabase-backed; replaces browser Firestore)
-    Route::prefix('api/teacher')->group(function () {
-        Route::get('/classes', [TeacherDataController::class, 'listClasses']);
-        Route::post('/classes', [TeacherDataController::class, 'storeClass']);
-        Route::get('/classes/{id}', [TeacherDataController::class, 'showClass']);
-        Route::post('/classes/{classId}/members/{userId}/approve', [TeacherDataController::class, 'approveMember']);
-        Route::post('/classes/{classId}/members/{userId}/reject', [TeacherDataController::class, 'rejectMember']);
-        Route::patch('/classes/{id}', [TeacherDataController::class, 'updateClass']);
-        Route::delete('/classes/{id}', [TeacherDataController::class, 'destroyClass']);
-
-        Route::get('/classes/{classId}/announcements', [TeacherDataController::class, 'listAnnouncements']);
-        Route::post('/classes/{classId}/announcements', [TeacherDataController::class, 'storeAnnouncement']);
-        Route::post('/classes/{classId}/announcement-files', [TeacherDataController::class, 'uploadAnnouncementFile']);
-        Route::delete('/classes/{classId}/announcements/{id}', [TeacherDataController::class, 'destroyAnnouncement']);
-
-        Route::get('/classes/{classId}/activities', [TeacherDataController::class, 'listActivities']);
-        Route::post('/activities', [TeacherDataController::class, 'storeActivity']);
-        Route::get('/activities/{id}', [TeacherDataController::class, 'showActivity']);
-        Route::patch('/activities/{id}', [TeacherDataController::class, 'updateActivity']);
-        Route::delete('/activities/{id}', [TeacherDataController::class, 'destroyActivity']);
-        Route::get('/activities/{activityId}/submissions', [TeacherDataController::class, 'listSubmissions']);
-        Route::patch('/activities/{activityId}/submissions/{submissionId}/return', [TeacherDataController::class, 'returnSubmission']);
-        Route::post('/activities/{activityId}/attachments', [TeacherDataController::class, 'uploadAttachment']);
-        Route::delete('/activities/{activityId}/attachments', [TeacherDataController::class, 'deleteAttachment']);
-
-        Route::get('/notifications', [TeacherDataController::class, 'listNotifications']);
-        Route::patch('/notifications/{id}/read', [TeacherDataController::class, 'markNotificationRead']);
-        Route::get('/lab-templates', [TeacherDataController::class, 'listTemplates']);
-        Route::get('/lab-templates/{id}', [TeacherDataController::class, 'showTemplate']);
+        Route::prefix('api/admin')->group(function () {
+            Route::get('/teachers', [AdminDataController::class, 'listTeachers']);
+            Route::get('/teachers/{id}', [AdminDataController::class, 'showTeacher']);
+            Route::get('/classes/{classId}/students', [AdminDataController::class, 'classStudents']);
+            Route::get('/lab-templates', [AdminDataController::class, 'listTemplates']);
+            Route::get('/lab-templates/{id}', [AdminDataController::class, 'showTemplate']);
+            Route::post('/lab-templates', [AdminDataController::class, 'createTemplate']);
+            Route::put('/lab-templates/{id}', [AdminDataController::class, 'updateTemplate']);
+            Route::delete('/lab-templates/{id}', [AdminDataController::class, 'deleteTemplate']);
+        });
     });
 
+    // Teacher portal (admins are redirected to admin.dashboard)
+    Route::middleware([EnsureTeacherRole::class])->group(function () {
+        Route::get('/dashboard', fn () => view('teacher.dashboard'))->name('dashboard');
 
-    Route::post('/profile/password', [ProfileController::class, 'updatePassword'])
-        ->name('profile.password.update');
+        Route::prefix('api/teacher')->group(function () {
+            Route::get('/classes', [TeacherDataController::class, 'listClasses']);
+            Route::post('/classes', [TeacherDataController::class, 'storeClass']);
+            Route::get('/classes/{id}', [TeacherDataController::class, 'showClass']);
+            Route::post('/classes/{classId}/members/{userId}/approve', [TeacherDataController::class, 'approveMember']);
+            Route::post('/classes/{classId}/members/{userId}/reject', [TeacherDataController::class, 'rejectMember']);
+            Route::patch('/classes/{id}', [TeacherDataController::class, 'updateClass']);
+            Route::delete('/classes/{id}', [TeacherDataController::class, 'destroyClass']);
 
-    // Every class-section route lives under one prefix/name group so
-    // there is exactly one place a given URI can match — no more
-    // duplicate `/classes/{id}` declarations shadowing each other.
-    Route::prefix('classes')->name('classes.')->group(function () {
-        Route::get('/', fn () => view('classes.dashboard'))->name('dashboard');
-        Route::get('/create', [ClassController::class, 'create'])->name('create');
+            Route::get('/classes/{classId}/announcements', [TeacherDataController::class, 'listAnnouncements']);
+            Route::post('/classes/{classId}/announcements', [TeacherDataController::class, 'storeAnnouncement']);
+            Route::post('/classes/{classId}/announcement-files', [TeacherDataController::class, 'uploadAnnouncementFile']);
+            Route::delete('/classes/{classId}/announcements/{id}', [TeacherDataController::class, 'destroyAnnouncement']);
 
-        // Constrained so a literal segment like "create" or "dashboard"
-        // can never be swallowed by this wildcard.
-        Route::get('/{id}', fn ($id) => view('teacher.classroom', ['classId' => $id]))
-            ->name('classroom')
-            ->where('id', '[A-Za-z0-9\-]+');
+            Route::get('/classes/{classId}/activities', [TeacherDataController::class, 'listActivities']);
+            Route::post('/activities', [TeacherDataController::class, 'storeActivity']);
+            Route::get('/activities/{id}', [TeacherDataController::class, 'showActivity']);
+            Route::patch('/activities/{id}', [TeacherDataController::class, 'updateActivity']);
+            Route::delete('/activities/{id}', [TeacherDataController::class, 'destroyActivity']);
+            Route::get('/activities/{activityId}/submissions', [TeacherDataController::class, 'listSubmissions']);
+            Route::patch('/activities/{activityId}/submissions/{submissionId}/return', [TeacherDataController::class, 'returnSubmission']);
+            Route::post('/activities/{activityId}/attachments', [TeacherDataController::class, 'uploadAttachment']);
+            Route::delete('/activities/{activityId}/attachments', [TeacherDataController::class, 'deleteAttachment']);
 
-        Route::get('/{classId}/activities/{activityId}', function ($classId, $activityId) {
-            return view('teacher.activity-show', [
-                'classId' => $classId,
-                'activityId' => $activityId,
-            ]);
-        })->name('classes.activity.show')
-          ->where(['classId' => '[A-Za-z0-9\-]+', 'activityId' => '[A-Za-z0-9\-]+']);
-        Route::get(
-            '/{classId}/activities/{activityId}/submissions/{submissionId}',
-            function ($classId, $activityId, $submissionId) {
-                return view(
-                    'dash-component.classroom-content.activity-submission',
-                    compact('classId', 'activityId', 'submissionId')
-                );
-            }
-        )->name('activities.submissions.show');
-    });
+            Route::get('/notifications', [TeacherDataController::class, 'listNotifications']);
+            Route::patch('/notifications/{id}/read', [TeacherDataController::class, 'markNotificationRead']);
+            Route::get('/lab-templates', [TeacherDataController::class, 'listTemplates']);
+            Route::get('/lab-templates/{id}', [TeacherDataController::class, 'showTemplate']);
+        });
 
-    // These stayed closures in the original file too — there's no
-    // EquipmentController in this codebase. If you want one later
-    // (e.g. once equipment data moves out of hardcoded Alpine arrays
-    // and into Firestore), that's a real refactor, not part of this
-    // routing cleanup.
-    Route::get('/equipment', fn () => view('dash-component.equipment-content.index'))->name('equipment.index');
+        Route::post('/profile/password', [ProfileController::class, 'updatePassword'])
+            ->name('profile.password.update');
+
+        Route::prefix('classes')->name('classes.')->group(function () {
+            Route::get('/', fn () => view('classes.dashboard'))->name('dashboard');
+            Route::get('/create', [ClassController::class, 'create'])->name('create');
+
+            Route::get('/{id}', fn ($id) => view('teacher.classroom', ['classId' => $id]))
+                ->name('classroom')
+                ->where('id', '[A-Za-z0-9\-]+');
+
+            Route::get('/{classId}/activities/{activityId}', function ($classId, $activityId) {
+                return view('teacher.activity-show', [
+                    'classId' => $classId,
+                    'activityId' => $activityId,
+                ]);
+            })->name('classes.activity.show')
+              ->where(['classId' => '[A-Za-z0-9\-]+', 'activityId' => '[A-Za-z0-9\-]+']);
+            Route::get(
+                '/{classId}/activities/{activityId}/submissions/{submissionId}',
+                function ($classId, $activityId, $submissionId) {
+                    return view(
+                        'dash-component.classroom-content.activity-submission',
+                        compact('classId', 'activityId', 'submissionId')
+                    );
+                }
+            )->name('activities.submissions.show');
+        });
+
+        Route::get('/equipment', fn () => view('dash-component.equipment-content.index'))->name('equipment.index');
+    }); // EnsureTeacherRole
 });
+
 

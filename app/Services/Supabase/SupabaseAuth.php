@@ -178,14 +178,48 @@ class SupabaseAuth
         $name = $meta['full_name'] ?? $meta['name'] ?? $email ?? 'Teacher';
         $photo = $meta['avatar_url'] ?? $meta['picture'] ?? null;
 
+        // Never downgrade an existing admin when they sign in on the web
+        $existing = $this->getProfile($id);
+        $existingRole = strtolower((string) ($existing['role'] ?? ''));
+        $role = $existingRole === 'admin' ? 'admin' : 'teacher';
+
         $row = [
             'id' => $id,
             'email' => $email,
             'display_name' => $name,
             'photo_url' => $photo,
-            'role' => 'teacher',
+            'role' => $role,
             'updated_at' => now()->toIso8601String(),
         ];
+
+        // New profiles only — if profile exists, patch without forcing role unless new
+        if ($existing) {
+            $patchBody = [
+                'email' => $email,
+                'display_name' => $name,
+                'photo_url' => $photo,
+                'updated_at' => now()->toIso8601String(),
+            ];
+            // Only set role on create path; keep admin as admin
+            if ($existingRole === '' || $existingRole === 'teacher' || $existingRole === 'educator') {
+                // leave role as-is for students who shouldn't use web (handled by login gate)
+            }
+            $patch = $this->client->service()
+                ->withHeaders(['Prefer' => 'return=representation'])
+                ->patch('/rest/v1/profiles?id=eq.'.$id, $patchBody);
+
+            if (! $patch->successful()) {
+                throw new RuntimeException(
+                    'Could not update profile: HTTP '.$patch->status().' '.$patch->body()
+                );
+            }
+            $data = $patch->json();
+            if (is_array($data) && isset($data[0])) {
+                return $data[0];
+            }
+
+            return is_array($data) && $data ? $data : array_merge($existing, $patchBody);
+        }
 
         $response = $this->client->service()
             ->withHeaders([
@@ -194,27 +228,12 @@ class SupabaseAuth
             ->post('/rest/v1/profiles', $row);
 
         if (! $response->successful()) {
-            // Fallback: patch if exists
-            $patch = $this->client->service()
-                ->withHeaders(['Prefer' => 'return=representation'])
-                ->patch('/rest/v1/profiles?id=eq.'.$id, [
-                    'email' => $email,
-                    'display_name' => $name,
-                    'photo_url' => $photo,
-                    'updated_at' => now()->toIso8601String(),
-                ]);
-
-            if (! $patch->successful()) {
-                throw new RuntimeException(
-                    'Could not upsert profile: HTTP '.$response->status().' '.$response->body()
-                );
-            }
-
-            $data = $patch->json();
-        } else {
-            $data = $response->json();
+            throw new RuntimeException(
+                'Could not upsert profile: HTTP '.$response->status().' '.$response->body()
+            );
         }
 
+        $data = $response->json();
         if (is_array($data) && isset($data[0])) {
             return $data[0];
         }

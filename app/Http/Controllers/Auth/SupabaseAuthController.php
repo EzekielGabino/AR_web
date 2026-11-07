@@ -32,9 +32,9 @@ class SupabaseAuthController extends Controller
             $profile = $this->supabaseAuth->upsertTeacherProfile($authUser);
 
             $role = strtolower($profile['role'] ?? 'teacher');
-            if ($role !== 'teacher' && $role !== 'educator') {
+            if ($role !== 'admin' && $role !== 'teacher' && $role !== 'educator') {
                 return response()->json([
-                    'message' => 'Access Restricted: The Web Dashboard is for teachers only. Students must use the SciLens AR Mobile App.',
+                    'message' => 'Access Restricted: The Web Dashboard is for teachers and admins only. Students must use the SciLens AR Mobile App.',
                 ], 403);
             }
 
@@ -47,7 +47,10 @@ class SupabaseAuthController extends Controller
                 return response()->json(['redirect' => route('auth.set-password')]);
             }
 
-            return response()->json(['redirect' => route('dashboard')]);
+            $dest = strtolower((string) ($profile['role'] ?? 'teacher')) === 'admin'
+                ? route('admin.dashboard')
+                : route('dashboard');
+            return response()->json(['redirect' => $dest]);
         } catch (Throwable $e) {
             report($e);
 

@@ -119,13 +119,17 @@ class LoginController extends Controller
             }
 
             $role = strtolower($profile['role'] ?? 'teacher');
-            if ($role !== 'teacher' && $role !== 'educator') {
+            if ($role !== 'admin' && $role !== 'teacher' && $role !== 'educator') {
                 return back()->withInput()->withErrors([
-                    'email' => 'Access Restricted: The Web Dashboard is for teachers only. Students must use the SciLens AR Mobile App.',
+                    'email' => 'Access Restricted: The Web Dashboard is for teachers and admins only. Students must use the SciLens AR Mobile App.',
                 ]);
             }
 
             $this->putSession($request, $authUser, $profile);
+
+            if ($role === 'admin') {
+                return redirect()->route('admin.dashboard');
+            }
 
             return redirect()->route('dashboard');
         } catch (Throwable $e) {
