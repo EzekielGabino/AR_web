@@ -9,11 +9,10 @@
                 <p class="truncate text-[10px] font-bold uppercase tracking-wider text-[#ABD2FA]/70">Admin portal</p>
             </div>
         </a>
-        <nav class="hidden items-center gap-2 sm:flex">
-            <a href="{{ route('admin.dashboard') }}?tab=teachers"
-                class="rounded-xl px-3 py-2 text-xs font-bold text-white/90 hover:bg-white/10 {{ request('tab', 'teachers') === 'teachers' ? 'bg-white/15' : '' }}">Teachers</a>
-            <a href="{{ route('admin.dashboard') }}?tab=templates"
-                class="rounded-xl px-3 py-2 text-xs font-bold text-white/90 hover:bg-white/10 {{ request('tab') === 'templates' ? 'bg-white/15' : '' }}">Lab templates</a>
+        <nav class="hidden items-center gap-1 md:flex">
+            <a href="{{ route('admin.dashboard') }}?tab=teachers" class="rounded-xl px-3 py-2 text-xs font-bold text-white/90 hover:bg-white/10">Teachers</a>
+            <a href="{{ route('admin.dashboard') }}?tab=students" class="rounded-xl px-3 py-2 text-xs font-bold text-white/90 hover:bg-white/10">Students</a>
+            <a href="{{ route('admin.dashboard') }}?tab=templates" class="rounded-xl px-3 py-2 text-xs font-bold text-white/90 hover:bg-white/10">Lab templates</a>
         </nav>
         <div class="flex items-center gap-2">
             <span class="hidden max-w-[10rem] truncate text-xs font-bold text-[#ABD2FA] sm:inline">{{ session('teacher_name') ?: session('teacher_email') ?: 'Admin' }}</span>

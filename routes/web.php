@@ -74,11 +74,19 @@ Route::middleware([EnsureFirebaseSessionIsValid::class])->group(function () {
             Route::get('/classes/{classId}/students', fn ($classId) => view('admin.class-students', ['classId' => $classId]))
                 ->name('classes.students')
                 ->where('classId', '[A-Za-z0-9\-]+');
+            Route::get('/lab-templates/new', fn () => view('admin.template-edit', ['templateId' => null]))->name('templates.create');
+            Route::get('/lab-templates/{templateId}/edit', fn ($templateId) => view('admin.template-edit', ['templateId' => $templateId]))
+                ->name('templates.edit')
+                ->where('templateId', '[A-Za-z0-9\-]+');
         });
 
         Route::prefix('api/admin')->group(function () {
             Route::get('/teachers', [AdminDataController::class, 'listTeachers']);
             Route::get('/teachers/{id}', [AdminDataController::class, 'showTeacher']);
+            Route::get('/students', [AdminDataController::class, 'listStudents']);
+            Route::post('/users', [AdminDataController::class, 'createUser']);
+            Route::patch('/users/{id}/role', [AdminDataController::class, 'updateUserRole']);
+            Route::delete('/users/{id}', [AdminDataController::class, 'deleteUser']);
             Route::get('/classes/{classId}/students', [AdminDataController::class, 'classStudents']);
             Route::get('/lab-templates', [AdminDataController::class, 'listTemplates']);
             Route::get('/lab-templates/{id}', [AdminDataController::class, 'showTemplate']);

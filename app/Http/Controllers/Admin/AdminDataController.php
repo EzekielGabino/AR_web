@@ -197,6 +197,195 @@ class AdminDataController extends Controller
         return response()->json(['ok' => true]);
     }
 
+
+    // -------------------------------------------------------------------------
+    // Profiles: teachers & students
+    // -------------------------------------------------------------------------
+
+    public function listStudents()
+    {
+        $rows = $this->db->get('profiles', [
+            'role' => 'eq.student',
+            'order' => 'display_name.asc',
+            'select' => 'id,email,display_name,photo_url,role,created_at',
+        ]);
+
+        return response()->json(array_map(fn ($p) => [
+            'id' => $p['id'] ?? null,
+            'email' => $p['email'] ?? '',
+            'display_name' => $p['display_name'] ?? 'Student',
+            'photo_url' => $p['photo_url'] ?? null,
+            'role' => $p['role'] ?? 'student',
+            'created_at' => $p['created_at'] ?? null,
+        ], $rows));
+    }
+
+    public function createUser(Request $request)
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string|min:6',
+            'display_name' => 'nullable|string|max:120',
+            'role' => 'required|in:teacher,educator,student,admin',
+        ]);
+
+        $url = \App\Services\Supabase\SupabaseClient::normalizeProjectUrl((string) config('supabase.url'));
+        $serviceKey = (string) config('supabase.service_role_key');
+
+        $response = \Illuminate\Support\Facades\Http::baseUrl($url)
+            ->withHeaders([
+                'apikey' => $serviceKey,
+                'Authorization' => 'Bearer '.$serviceKey,
+                'Content-Type' => 'application/json',
+            ])
+            ->post('/auth/v1/admin/users', [
+                'email' => $data['email'],
+                'password' => $data['password'],
+                'email_confirm' => true,
+                'user_metadata' => [
+                    'full_name' => $data['display_name'] ?? $data['email'],
+                    'name' => $data['display_name'] ?? $data['email'],
+                ],
+            ]);
+
+        if (! $response->successful()) {
+            return response()->json([
+                'message' => 'Could not create auth user: '.$response->body(),
+            ], 422);
+        }
+
+        $authUser = $response->json();
+        $id = $authUser['id'] ?? null;
+        if (! $id) {
+            return response()->json(['message' => 'Auth user created but id missing.'], 500);
+        }
+
+        $row = [
+            'id' => $id,
+            'email' => $data['email'],
+            'display_name' => $data['display_name'] ?? $data['email'],
+            'role' => $data['role'],
+            'has_password_set' => true,
+            'updated_at' => now()->toIso8601String(),
+            'created_at' => now()->toIso8601String(),
+        ];
+
+        try {
+            $created = $this->db->insert('profiles', $row);
+        } catch (\Throwable $e) {
+            // Profile may already exist from trigger — patch role
+            $this->db->update('profiles', 'id', $id, [
+                'email' => $data['email'],
+                'display_name' => $data['display_name'] ?? $data['email'],
+                'role' => $data['role'],
+                'has_password_set' => true,
+                'updated_at' => now()->toIso8601String(),
+            ]);
+            $created = $row;
+        }
+
+        return response()->json([
+            'id' => $id,
+            'email' => $data['email'],
+            'display_name' => $data['display_name'] ?? $data['email'],
+            'role' => $data['role'],
+        ], 201);
+    }
+
+    public function updateUserRole(Request $request, string $id)
+    {
+        $data = $request->validate([
+            'role' => 'required|in:teacher,educator,student,admin',
+            'display_name' => 'nullable|string|max:120',
+        ]);
+
+        $self = session('auth_uid') ?: session('firebase_uid');
+        if ($self && $self === $id && $data['role'] !== 'admin') {
+            return response()->json(['message' => 'You cannot remove your own admin role.'], 422);
+        }
+
+        $rows = $this->db->get('profiles', ['id' => 'eq.'.$id, 'limit' => 1]);
+        if (! $rows) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        $patch = [
+            'role' => $data['role'],
+            'updated_at' => now()->toIso8601String(),
+        ];
+        if (array_key_exists('display_name', $data) && $data['display_name'] !== null) {
+            $patch['display_name'] = $data['display_name'];
+        }
+
+        $updated = $this->db->update('profiles', 'id', $id, $patch);
+
+        return response()->json([
+            'id' => $id,
+            'role' => $data['role'],
+            'display_name' => $patch['display_name'] ?? ($rows[0]['display_name'] ?? ''),
+            'email' => $rows[0]['email'] ?? '',
+        ]);
+    }
+
+    public function deleteUser(string $id)
+    {
+        $self = session('auth_uid') ?: session('firebase_uid');
+        if ($self && $self === $id) {
+            return response()->json(['message' => 'You cannot delete your own account.'], 422);
+        }
+
+        $rows = $this->db->get('profiles', ['id' => 'eq.'.$id, 'limit' => 1]);
+        if (! $rows) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        $role = strtolower((string) ($rows[0]['role'] ?? ''));
+        if (in_array($role, ['teacher', 'educator'], true)) {
+            $classes = $this->db->get('classes', [
+                'teacher_id' => 'eq.'.$id,
+                'select' => 'id',
+            ]);
+            if ($classes) {
+                return response()->json([
+                    'message' => 'This teacher still has '.count($classes).' class(es). Reassign or delete those classes first.',
+                ], 422);
+            }
+        }
+
+        // Remove class memberships
+        try {
+            $members = $this->db->get('class_members', [
+                'user_id' => 'eq.'.$id,
+                'select' => 'id',
+            ]);
+            foreach ($members as $m) {
+                if (! empty($m['id'])) {
+                    $this->db->delete('class_members', 'id', $m['id']);
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        $this->db->delete('profiles', 'id', $id);
+
+        // Delete auth user (service role)
+        try {
+            $url = \App\Services\Supabase\SupabaseClient::normalizeProjectUrl((string) config('supabase.url'));
+            $serviceKey = (string) config('supabase.service_role_key');
+            \Illuminate\Support\Facades\Http::baseUrl($url)
+                ->withHeaders([
+                    'apikey' => $serviceKey,
+                    'Authorization' => 'Bearer '.$serviceKey,
+                ])
+                ->delete('/auth/v1/admin/users/'.$id);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
