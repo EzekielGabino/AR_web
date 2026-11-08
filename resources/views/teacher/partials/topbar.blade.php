@@ -86,10 +86,10 @@
         <div class="flex items-center gap-2">
             <button type="button"
                 @click="helpOpen = true; helpStep = 0"
-                class="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#7692FF]/30 bg-white/5 text-white transition hover:bg-white/10"
+                class="rounded-2xl border border-[#7692FF]/30 bg-white/5 px-3 py-2 text-[11px] font-bold text-white transition hover:bg-white/10"
                 title="How to use SciLens"
-                aria-label="Help and onboarding">
-                <span class="text-sm font-black">i</span>
+                aria-label="Quick Guide">
+                Quick Guide
             </button>
 
             <div class="relative">
@@ -114,7 +114,7 @@
                             class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-white hover:bg-white/10">
                             Change password
                         </button>
-                        <form method="POST" action="{{ route('logout') }}">
+                        <form method="POST" action="{{ route('logout') }}" onsubmit="if (window.scilensAuthPing) window.scilensAuthPing()">
                             @csrf
                             <button type="submit"
                                 class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-rose-300 hover:bg-rose-500/10">

@@ -166,5 +166,6 @@ class SupabaseAuthController extends Controller
         ]);
 
         $request->session()->regenerate();
+        $request->session()->flash('auth_ping', true);
     }
 }

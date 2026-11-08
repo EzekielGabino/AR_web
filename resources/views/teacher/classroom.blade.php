@@ -1141,7 +1141,10 @@
                 const elModal = document.getElementById('class-qr-modal');
                 if (elModal) {
                     elModal.innerHTML = '';
-                    new QRCode(elModal, { text: String(code), width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+                    // Web scanners open home via /join/{code}. Mobile app can intercept the same path.
+                    const base = @js(rtrim(config('app.url') ?: url('/'), '/'));
+                    const payload = base + '/join/' + encodeURIComponent(String(code).trim());
+                    new QRCode(elModal, { text: payload, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
                 }
             },
             openQr() {

@@ -46,6 +46,26 @@
     @yield('content')
     @stack('scripts')
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<script>
+(function () {
+    const KEY = 'scilens_auth_ping';
+    window.scilensAuthPing = function () {
+        try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {}
+    };
+    window.addEventListener('storage', function (e) {
+        if (e.key === KEY) {
+            window.location.reload();
+        }
+    });
+})();
+</script>
+
+@if(session('auth_ping'))
+<script>if (window.scilensAuthPing) window.scilensAuthPing();</script>
+@endif
+
+
 </body>
 
 </html>

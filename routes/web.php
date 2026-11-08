@@ -33,6 +33,10 @@ use App\Http\Controllers\Admin\AdminDataController;
 // Public / marketing (v2 — single page: hero + overview + login)
 // Old blades live under resources/views(old)/ for reference only.
 // ---------------------------------------------------------------------
+Route::get('/join/{code}', function (string $code) {
+    return redirect()->route('welcome');
+})->where('code', '[A-Za-z0-9]+')->name('join.class');
+
 Route::get('/', fn () => view('public.home'))->name('welcome');
 
 // Login is on the home page (#login). Keep named route for redirects.

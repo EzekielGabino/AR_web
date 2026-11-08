@@ -176,5 +176,6 @@ class LoginController extends Controller
             'user_role' => $profile['role'] ?? 'teacher',
         ]);
         $request->session()->regenerate();
+        $request->session()->flash('auth_ping', true);
     }
 }

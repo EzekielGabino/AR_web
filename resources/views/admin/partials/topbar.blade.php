@@ -11,7 +11,7 @@
         </a>
         <div class="flex items-center gap-2">
             <span class="hidden max-w-[10rem] truncate text-xs font-bold text-[#ABD2FA] sm:inline">{{ session('teacher_name') ?: session('teacher_email') ?: 'Admin' }}</span>
-            <form method="POST" action="{{ route('logout') }}">
+            <form method="POST" action="{{ route('logout') }}" onsubmit="if (window.scilensAuthPing) window.scilensAuthPing()">
                 @csrf
                 <button type="submit" class="rounded-xl border border-[#7692FF]/40 bg-white/5 px-3 py-2 text-xs font-bold text-white hover:bg-white/10">Sign out</button>
             </form>

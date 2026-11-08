@@ -1,5 +1,5 @@
 {{-- public nav --}}
-<div x-data="{ homeHelpOpen: false }" @keydown.escape.window="homeHelpOpen = false">
+<div x-data="publicNavRoot()" x-init="init()" @keydown.escape.window="homeHelpOpen = false">
     <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <a href="{{ route('welcome') }}#top" class="flex min-w-0 items-center gap-2 group">
             <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#ABD2FA]/60 bg-[#ABD2FA]/20 p-1.5 shadow-xs transition-transform group-hover:scale-105">
@@ -8,16 +8,24 @@
             <span class="truncate text-sm font-black tracking-tight text-[#091540]">SciLens AR</span>
         </a>
         <nav class="flex shrink-0 items-center gap-2 text-xs font-bold text-[#091540]/80 sm:gap-3">
-            <a href="#overview" class="hidden transition-colors hover:text-[#1B2CC1] sm:inline">Overview</a>
-            <a href="#ar-lab" class="hidden transition-colors hover:text-[#1B2CC1] md:inline">AR lab</a>
-            <a href="#see-the-lab" class="hidden transition-colors hover:text-[#1B2CC1] lg:inline">See the lab</a>
-            <a href="#student-app" class="hidden transition-colors hover:text-[#1B2CC1] xl:inline">Student app</a>
+            <a href="#overview" data-nav-section="overview"
+                class="hidden transition-colors hover:text-[#1B2CC1] sm:inline"
+                :class="active === 'overview' ? 'text-[#1B2CC1] underline decoration-2 underline-offset-4' : ''">Overview</a>
+            <a href="#ar-lab" data-nav-section="ar-lab"
+                class="hidden transition-colors hover:text-[#1B2CC1] md:inline"
+                :class="active === 'ar-lab' ? 'text-[#1B2CC1] underline decoration-2 underline-offset-4' : ''">AR lab</a>
+            <a href="#see-the-lab" data-nav-section="see-the-lab"
+                class="hidden transition-colors hover:text-[#1B2CC1] lg:inline"
+                :class="active === 'see-the-lab' ? 'text-[#1B2CC1] underline decoration-2 underline-offset-4' : ''">See the lab</a>
+            <a href="#student-app" data-nav-section="student-app"
+                class="hidden transition-colors hover:text-[#1B2CC1] xl:inline"
+                :class="active === 'student-app' ? 'text-[#1B2CC1] underline decoration-2 underline-offset-4' : ''">Student app</a>
             <button type="button"
                 @click="homeHelpOpen = true"
-                class="flex h-9 w-9 items-center justify-center rounded-full border border-[#ABD2FA]/70 bg-white text-sm font-black text-[#1B2CC1] shadow-sm transition hover:border-[#1B2CC1] hover:bg-[#ABD2FA]/30"
+                class="rounded-full border border-[#ABD2FA]/70 bg-white px-3 py-1.5 text-[11px] font-bold text-[#1B2CC1] shadow-sm transition hover:border-[#1B2CC1] hover:bg-[#ABD2FA]/30"
                 title="How to sign in"
-                aria-label="Help signing in">
-                i
+                aria-label="Quick Guide">
+                Quick Guide
             </button>
             <a href="#login" onclick="window.scrollToLogin && window.scrollToLogin(event)"
                 class="rounded-xl bg-[#1B2CC1] px-3 py-2 text-white shadow-md shadow-[#1B2CC1]/20 transition-all hover:bg-[#1B2CC1]/90 hover:shadow-[#1B2CC1]/30 active:scale-[0.98] sm:px-4">
@@ -54,3 +62,26 @@
         </div>
     </template>
 </div>
+
+<script>
+function publicNavRoot() {
+    return {
+        homeHelpOpen: false,
+        active: '',
+        ids: ['overview', 'ar-lab', 'see-the-lab', 'student-app'],
+        init() {
+            const onScroll = () => {
+                let current = '';
+                const y = window.scrollY + 120;
+                for (const id of this.ids) {
+                    const el = document.getElementById(id);
+                    if (el && el.offsetTop <= y) current = id;
+                }
+                this.active = current;
+            };
+            onScroll();
+            window.addEventListener('scroll', onScroll, { passive: true });
+        },
+    };
+}
+</script>
