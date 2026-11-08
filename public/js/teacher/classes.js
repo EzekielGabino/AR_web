@@ -36,6 +36,7 @@ export async function createClass(form) {
         body: JSON.stringify({
             section_name: form.section_name,
             grade_level: form.grade_level,
+            academic_year: form.academic_year,
             subject: form.subject,
             access_code: form.access_code,
         }),
@@ -48,6 +49,7 @@ export async function updateClass(id, form) {
         body: JSON.stringify({
             section_name: form.section_name,
             grade_level: form.grade_level,
+            academic_year: form.academic_year,
             subject: form.subject,
             access_code: form.access_code,
         }),

@@ -10,11 +10,40 @@
         form: {
             section_name: '',
             grade_level: 'Grade 8',
+            academic_year: '',
             subject: '',
             access_code: '',
         },
+        filterGrade: '',
+        filterYear: '',
         async init() {
             await this.load();
+        },
+        defaultAcademicYear() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = now.getMonth();
+            const start = m >= 5 ? y : y - 1;
+            return start + '-' + (start + 1);
+        },
+        filteredClasses() {
+            return (this.classes || []).filter((c) => {
+                if (this.filterGrade && (c.grade_level || '') !== this.filterGrade) return false;
+                if (this.filterYear && (c.academic_year || '') !== this.filterYear) return false;
+                return true;
+            });
+        },
+        gradeOptions() {
+            const set = new Set();
+            (this.classes || []).forEach((c) => { if (c.grade_level) set.add(c.grade_level); });
+            ['Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'].forEach((g) => set.add(g));
+            return Array.from(set).sort();
+        },
+        yearOptions() {
+            const set = new Set();
+            (this.classes || []).forEach((c) => { if (c.academic_year) set.add(c.academic_year); });
+            set.add(this.defaultAcademicYear());
+            return Array.from(set).sort().reverse();
         },
         async load() {
             this.loading = true;
@@ -48,6 +77,7 @@
             this.form = {
                 section_name: '',
                 grade_level: 'Grade 8',
+                academic_year: this.defaultAcademicYear(),
                 subject: '',
                 access_code: window.TeacherClasses.generateAccessCode(),
             };
@@ -59,6 +89,7 @@
             this.form = {
                 section_name: c.section_name || '',
                 grade_level: c.grade_level || 'Grade 8',
+                academic_year: c.academic_year || this.defaultAcademicYear(),
                 subject: c.subject || '',
                 access_code: c.access_code || '',
             };
@@ -172,8 +203,36 @@
     </div>
 
     {{-- Classes Grid --}}
-    <div x-show="!loading && classes.length > 0" x-cloak class="grid gap-4 sm:grid-cols-2">
-        <template x-for="c in classes" :key="c.id">
+    <div x-show="!loading && classes.length > 0" class="flex flex-wrap items-end gap-3">
+        <div>
+            <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#091540]/60">Grade</label>
+            <select x-model="filterGrade" class="rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540]">
+                <option value="">All grades</option>
+                <template x-for="g in gradeOptions()" :key="g">
+                    <option :value="g" x-text="g"></option>
+                </template>
+            </select>
+        </div>
+        <div>
+            <label class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#091540]/60">Academic year</label>
+            <select x-model="filterYear" class="rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540]">
+                <option value="">All years</option>
+                <template x-for="y in yearOptions()" :key="y">
+                    <option :value="y" x-text="y"></option>
+                </template>
+            </select>
+        </div>
+        <button type="button" x-show="filterGrade || filterYear" @click="filterGrade = ''; filterYear = ''"
+            class="cursor-pointer text-xs font-bold text-[#1B2CC1] underline">Clear filters</button>
+    </div>
+
+    <div x-show="!loading && classes.length > 0 && filteredClasses().length === 0" x-cloak
+        class="rounded-2xl border border-dashed border-[#ABD2FA] bg-white p-6 text-center text-xs font-medium text-[#091540]/60">
+        No classes match these filters.
+    </div>
+
+    <div x-show="!loading && filteredClasses().length > 0" x-cloak class="grid gap-4 sm:grid-cols-2">
+        <template x-for="c in filteredClasses()" :key="c.id">
             <div class="group relative overflow-hidden rounded-3xl border border-[#ABD2FA]/60 bg-white/95 p-6 shadow-sm shadow-[#1B2CC1]/5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#7692FF] hover:shadow-xl hover:shadow-[#1B2CC1]/10">
                 {{-- Top Accent Line on Hover --}}
                 <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#1B2CC1] to-[#7692FF] opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
@@ -186,7 +245,10 @@
                         x-text="c.grade_level || '—'"></span>
                 </div>
 
-                <p class="mt-1.5 text-xs font-medium text-[#091540]/60" x-text="c.subject || 'No subject'"></p>
+                <p class="mt-1.5 text-xs font-medium text-[#091540]/60">
+                    <span x-text="c.subject || 'No subject'"></span>
+                    <span x-show="c.academic_year"> · SY <span x-text="c.academic_year"></span></span>
+                </p>
 
                 <div class="mt-4 flex items-center justify-between rounded-2xl bg-slate-50/80 px-4 py-3 border border-[#ABD2FA]/30 text-[11px] font-bold text-[#091540]/80">
                     <span>
@@ -242,13 +304,20 @@
                             <option>Grade 8</option>
                             <option>Grade 9</option>
                             <option>Grade 10</option>
+                            <option>Grade 11</option>
+                            <option>Grade 12</option>
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#091540]/70">Access code</label>
-                        <input type="text" x-model="form.access_code"
-                            class="w-full rounded-2xl border-[1.5px] border-[#ABD2FA]/80 bg-slate-50/50 px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-[#1B2CC1] focus:border-[#1B2CC1] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#7692FF]/20 transition-all">
+                        <label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#091540]/70">Academic year</label>
+                        <input type="text" x-model="form.academic_year" placeholder="2025-2026" required
+                            class="w-full rounded-2xl border-[1.5px] border-[#ABD2FA]/80 bg-slate-50/50 px-4 py-3 text-xs font-bold text-[#091540] placeholder:text-slate-400 focus:border-[#1B2CC1] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#7692FF]/20 transition-all">
                     </div>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#091540]/70">Access code</label>
+                    <input type="text" x-model="form.access_code"
+                        class="w-full rounded-2xl border-[1.5px] border-[#ABD2FA]/80 bg-slate-50/50 px-4 py-3 font-mono text-xs font-bold uppercase tracking-wider text-[#1B2CC1] focus:border-[#1B2CC1] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#7692FF]/20 transition-all">
                 </div>
 
                 <div>
@@ -267,7 +336,7 @@
                 </button>
                 <button type="button"
                     @click="modal === 'edit' ? submitEdit() : submitCreate()"
-                    :disabled="saving || !form.section_name.trim()"
+                    :disabled="saving || !form.section_name.trim() || !(form.academic_year || '').trim()"
                     class="cursor-pointer rounded-2xl bg-[#1B2CC1] px-6 py-3 text-xs font-bold text-white shadow-md shadow-[#1B2CC1]/20 transition-all hover:bg-[#1B2CC1]/90 disabled:opacity-50">
                     <span x-text="saving ? 'Saving…' : (modal === 'edit' ? 'Save changes' : 'Create')"></span>
                 </button>

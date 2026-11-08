@@ -250,6 +250,7 @@ class TeacherDataController extends Controller
         $data = $request->validate([
             'section_name' => 'required|string|max:255',
             'grade_level' => 'nullable|string|max:64',
+            'academic_year' => 'nullable|string|max:32',
             'subject' => 'nullable|string|max:128',
             'access_code' => 'nullable|string|max:32',
         ]);
@@ -263,6 +264,7 @@ class TeacherDataController extends Controller
             'teacher_id' => $uid,
             'section_name' => $data['section_name'],
             'grade_level' => $data['grade_level'] ?? 'Grade 8',
+            'academic_year' => $data['academic_year'] ?? null,
             'subject' => $data['subject'] ?? '',
             'access_code' => $code,
         ]);
@@ -281,6 +283,7 @@ class TeacherDataController extends Controller
         $data = $request->validate([
             'section_name' => 'required|string|max:255',
             'grade_level' => 'nullable|string|max:64',
+            'academic_year' => 'nullable|string|max:32',
             'subject' => 'nullable|string|max:128',
             'access_code' => 'nullable|string|max:32',
         ]);
@@ -289,6 +292,7 @@ class TeacherDataController extends Controller
         $row = $this->db->update('classes', 'id', $id, [
             'section_name' => $data['section_name'],
             'grade_level' => $data['grade_level'] ?? 'Grade 8',
+            'academic_year' => $data['academic_year'] ?? ($existing[0]['academic_year'] ?? null),
             'subject' => $data['subject'] ?? '',
             'access_code' => $code,
         ]);
@@ -527,6 +531,10 @@ class TeacherDataController extends Controller
                 if (in_array($snake, ['due_date', 'due_time', 'template_id'], true)) {
                     $val = $this->nullIfEmpty($val);
                 }
+                // JSON null for timestamps
+                if ($snake === 'published_at' && ($val === '' || $val === false)) {
+                    $val = null;
+                }
                 $patch[$snake] = $val;
             }
         }
@@ -536,6 +544,15 @@ class TeacherDataController extends Controller
         }
 
         $wasPublished = (bool) ($rows[0]['published'] ?? false);
+
+        // Unpublishing: clear published_at in the same PATCH
+        if (array_key_exists('published', $patch) && ! (bool) $patch['published']) {
+            $patch['published_at'] = null;
+            if (! array_key_exists('status', $patch)) {
+                $patch['status'] = 'draft';
+            }
+        }
+
         $row = $this->db->update('class_activities', 'id', $id, $patch);
         $mapped = $this->mapActivity($row ?? array_merge($rows[0], $patch));
 
@@ -565,23 +582,19 @@ class TeacherDataController extends Controller
         if ($wasPublished && ! $nowPublished) {
             $cleared = $this->clearActivitySubmissions($id);
             $mapped['submissionsCleared'] = $cleared;
-            if (array_key_exists('published_at', $patch) || ! array_key_exists('published_at', $patch)) {
-                // Ensure published_at cleared when moving back to draft
-                try {
-                    $this->db->update('class_activities', 'id', $id, ['published_at' => null]);
-                    $mapped['publishedAt'] = null;
-                } catch (Throwable $e) {
-                    report($e);
-                }
-            }
+            $mapped['publishedAt'] = null;
             $title = $mapped['title'] ?? 'Activity';
-            $this->notifyClassStudents(
-                $rows[0]['class_id'],
-                'activity_unpublished',
-                'Activity withdrawn',
-                $title.' is no longer assigned. Previous submissions were cleared.',
-                $id,
-            );
+            try {
+                $this->notifyClassStudents(
+                    $rows[0]['class_id'],
+                    'activity_unpublished',
+                    'Activity withdrawn',
+                    $title.' is no longer assigned. Previous submissions were cleared.',
+                    $id,
+                );
+            } catch (Throwable $e) {
+                report($e);
+            }
         }
 
         return response()->json($mapped);
@@ -854,6 +867,7 @@ class TeacherDataController extends Controller
             'id' => $r['id'],
             'section_name' => $r['section_name'] ?? '',
             'grade_level' => $r['grade_level'] ?? '',
+            'academic_year' => $r['academic_year'] ?? null,
             'subject' => $r['subject'] ?? '',
             'access_code' => $r['access_code'] ?? '',
             'teacher_uid' => $r['teacher_id'] ?? null,
