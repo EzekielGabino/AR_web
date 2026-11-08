@@ -19,14 +19,21 @@
         <ul class="mt-3 space-y-1.5" x-show="(draftAttachments || []).length">
             <template x-for="(file, fi) in (draftAttachments || [])" :key="file.storagePath || fi">
                 <li class="flex items-center justify-between gap-2 rounded-lg border border-[#ABD2FA]/50 bg-[#ABD2FA]/10 px-3 py-2">
-                    <a :href="file.url || file.downloadURL" target="_blank" rel="noopener"
-                        class="truncate text-xs font-bold text-[#1B2CC1] hover:underline"
-                        x-text="file.name || 'File'"></a>
+                    <div class="min-w-0 flex-1">
+                        <a :href="file.url || file.downloadURL" target="_blank" rel="noopener"
+                            class="block truncate text-xs font-bold text-[#1B2CC1] hover:underline"
+                            x-text="file.name || 'File'"></a>
+                        <p class="text-[10px] font-semibold text-[#091540]/55"
+                            x-text="formatBytes(file.size || file.bytes || 0)"></p>
+                    </div>
                     <button type="button" @click="draftAttachments.splice(fi, 1)"
                         class="shrink-0 text-xs font-bold text-rose-500 hover:text-rose-700">Remove</button>
                 </li>
             </template>
         </ul>
+        <p class="mt-1.5 text-[11px] font-bold text-[#091540]/70"
+            x-show="(draftAttachments || []).length"
+            x-text="'Total: ' + formatBytes((draftAttachments || []).reduce((s, f) => s + (Number(f.size || f.bytes) || 0), 0))"></p>
 
         <p x-show="streamError" x-text="streamError" class="mt-1.5 text-xs font-bold text-rose-500"></p>
         <div class="mt-3 flex justify-end">
@@ -45,13 +52,18 @@
             </div>
             <ul class="mt-3 space-y-1.5" x-show="(a.attachments || []).length">
                 <template x-for="(file, fi) in (a.attachments || [])" :key="file.storagePath || fi">
-                    <li>
+                    <li class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         <a :href="file.url || file.downloadURL" target="_blank" rel="noopener"
                             class="inline-flex items-center gap-1.5 text-xs font-bold text-[#1B2CC1] hover:underline"
                             x-text="file.name || 'Attachment'"></a>
+                        <span class="text-[10px] font-semibold text-[#091540]/55"
+                            x-text="formatBytes(file.size || file.bytes || 0)"></span>
                     </li>
                 </template>
             </ul>
+            <p class="mt-1 text-[11px] font-bold text-[#091540]/65"
+                x-show="(a.attachments || []).length"
+                x-text="'Total: ' + formatBytes((a.attachments || []).reduce((s, f) => s + (Number(f.size || f.bytes) || 0), 0))"></p>
             <p class="mt-3 text-[11px] font-semibold text-[#091540]/50" x-text="formatDate(a.created_at)"></p>
         </article>
     </template>

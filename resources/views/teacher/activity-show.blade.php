@@ -194,17 +194,25 @@
                                 @change="onActivityFileSelected($event)">
                         </label>
                     </div>
+                    <p class="mb-2 text-[11px] font-medium text-[#091540]/55">Max 15 MB per file.</p>
                     <ul class="space-y-2" x-show="(activity.attachments || []).length">
                         <template x-for="(file, fi) in (activity.attachments || [])" :key="file.storagePath || file.downloadURL || fi">
                             <li class="flex items-center justify-between gap-2 rounded-xl border border-[#ABD2FA]/60 bg-[#ABD2FA]/10 px-3.5 py-2.5">
-                                <a :href="file.url || file.downloadURL" target="_blank" rel="noopener"
-                                    class="truncate text-xs font-bold text-[#1B2CC1] hover:underline"
-                                    x-text="file.name || 'Attachment'"></a>
+                                <div class="min-w-0 flex-1">
+                                    <a :href="file.url || file.downloadURL" target="_blank" rel="noopener"
+                                        class="block truncate text-xs font-bold text-[#1B2CC1] hover:underline"
+                                        x-text="file.name || 'Attachment'"></a>
+                                    <p class="text-[10px] font-semibold text-[#091540]/55"
+                                        x-text="formatFileSize(file.size || file.bytes || 0)"></p>
+                                </div>
                                 <button type="button" x-show="!isPublished()" @click="removeActivityAttachment(fi)"
                                     class="cursor-pointer shrink-0 text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors">Remove</button>
                             </li>
                         </template>
                     </ul>
+                    <p class="mt-2 text-xs font-bold text-[#091540]/75"
+                        x-show="(activity.attachments || []).length"
+                        x-text="'Total: ' + formatFileSize(attachmentsTotalBytes())"></p>
                     <p class="text-xs font-medium text-[#091540]/60" x-show="!(activity.attachments || []).length">No file attachments.</p>
                     <p class="mt-2 text-[11px] font-medium text-[#091540]/50" x-show="isPublished()">Published activities cannot change files. Unpublish to add or remove.</p>
                 </div>

@@ -73,13 +73,20 @@
                             <ul class="space-y-2" x-show="(tplForm.attachments || []).length">
                                 <template x-for="(file, fi) in (tplForm.attachments || [])" :key="file.storagePath || file.name || fi">
                                     <li class="flex items-center justify-between gap-2 rounded-xl border border-[#ABD2FA]/60 bg-[#ABD2FA]/10 px-3.5 py-2.5">
-                                        <a :href="file.url || file.downloadURL" target="_blank" rel="noopener"
-                                            class="truncate text-xs font-bold text-[#1B2CC1] hover:underline"
-                                            x-text="file.name || 'Attachment'"></a>
+                                        <div class="min-w-0 flex-1">
+                                            <a :href="file.url || file.downloadURL" target="_blank" rel="noopener"
+                                                class="block truncate text-xs font-bold text-[#1B2CC1] hover:underline"
+                                                x-text="file.name || 'Attachment'"></a>
+                                            <p class="text-[10px] font-semibold text-[#091540]/55"
+                                                x-text="formatBytes(file.size || file.bytes || 0)"></p>
+                                        </div>
                                         <button type="button" @click="removeTplAttachment(fi)" class="shrink-0 text-xs font-bold text-rose-500 hover:text-rose-700">Remove</button>
                                     </li>
                                 </template>
                             </ul>
+                            <p class="mt-2 text-xs font-bold text-[#091540]/75"
+                                x-show="(tplForm.attachments || []).length"
+                                x-text="'Total: ' + formatBytes((tplForm.attachments || []).reduce((s, f) => s + (Number(f.size || f.bytes) || 0), 0))"></p>
                             <p class="text-xs text-[#091540]/60 font-medium" x-show="!(tplForm.attachments || []).length">No files yet. PDF, Word, or image (max 15 MB). On a new lab, files stay local until you click Save content.</p>
                         </div>
                     </div>
