@@ -1,4 +1,4 @@
-{{-- Student AR lab previews — phone frame (9:16), no fullscreen --}}
+{{-- Student AR lab previews — phone frame (9:16), SciLens poster, no fullscreen --}}
 <section id="see-the-lab" class="scroll-mt-24 relative overflow-hidden rounded-3xl border border-[#ABD2FA]/40 bg-white/90 px-4 py-14 shadow-sm sm:px-8 sm:py-16">
     <div class="relative mx-auto max-w-6xl">
         <div class="mx-auto max-w-2xl text-center">
@@ -14,6 +14,7 @@
         </div>
 
         @php
+            $logoUrl = asset('icons/logo.png');
             $clips = [
                 [
                     'title' => 'Place apparatus',
@@ -36,34 +37,65 @@
             ];
         @endphp
 
-        <div class="mt-10 grid grid-cols-1 justify-items-center gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            @foreach ($clips as $clip)
+        <div class="mt-10 grid grid-cols-1 justify-items-center gap-8 sm:grid-cols-2 lg:grid-cols-3"
+            x-data="{ playing: null }">
+            @foreach ($clips as $i => $clip)
                 <article class="flex w-full max-w-[280px] flex-col overflow-hidden rounded-[1.75rem] border border-[#ABD2FA]/50 bg-slate-50/80 shadow-md shadow-[#1B2CC1]/5">
-                    {{-- Phone bezel --}}
                     <div class="bg-[#091540] px-3 pt-3">
                         <div class="mx-auto mb-2 h-1.5 w-16 rounded-full bg-white/20"></div>
-                        <div class="relative mx-auto aspect-[9/16] w-full overflow-hidden rounded-xl bg-black">
+                        <div class="relative mx-auto aspect-[9/16] w-full overflow-hidden rounded-xl bg-[#091540]">
                             @if (!empty($clip['youtube']))
-                                <iframe
-                                    class="absolute inset-0 h-full w-full"
-                                    src="https://www.youtube-nocookie.com/embed/{{ $clip['youtube'] }}?playsinline=1&fs=0&modestbranding=1&rel=0"
-                                    title="{{ $clip['title'] }}"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowfullscreen="false"
-                                    loading="lazy"></iframe>
+                                <template x-if="playing === {{ $i }}">
+                                    <iframe
+                                        class="absolute inset-0 h-full w-full"
+                                        src="https://www.youtube-nocookie.com/embed/{{ $clip['youtube'] }}?playsinline=1&fs=0&modestbranding=1&rel=0&autoplay=1"
+                                        title="{{ $clip['title'] }}"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowfullscreen="false"
+                                        loading="lazy"></iframe>
+                                </template>
+                                <button type="button"
+                                    x-show="playing !== {{ $i }}"
+                                    @click="playing = {{ $i }}"
+                                    class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-[#091540] via-[#1B2CC1] to-[#091540] p-4">
+                                    <img src="{{ $logoUrl }}"
+                                        onerror="this.onerror=null;this.src='{{ asset('logo.png') }}'"
+                                        alt="SciLens AR"
+                                        class="h-20 w-20 object-contain drop-shadow-lg sm:h-24 sm:w-24">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white ring-1 ring-white/25">
+                                        <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"/></svg>
+                                        Play
+                                    </span>
+                                </button>
                             @else
                                 <video
+                                    x-ref="vid{{ $i }}"
                                     class="absolute inset-0 h-full w-full object-cover"
-                                    controls
                                     playsinline
-                                    preload="metadata"
+                                    preload="none"
                                     controlslist="nofullscreen nodownload noremoteplayback"
                                     disablepictureinpicture
                                     disableremoteplayback
-                                    poster="{{ asset('icons/logo.png') }}">
+                                    @play="playing = {{ $i }}"
+                                    @pause="if (playing === {{ $i }}) playing = null"
+                                    x-show="playing === {{ $i }}"
+                                    x-cloak
+                                    controls>
                                     <source src="{{ asset($clip['file']) }}" type="video/mp4">
-                                    Your browser does not support embedded video.
                                 </video>
+                                <button type="button"
+                                    x-show="playing !== {{ $i }}"
+                                    @click="playing = {{ $i }}; $nextTick(() => { const v = $refs.vid{{ $i }}; if (v) { v.play().catch(() => {}); } })"
+                                    class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-[#091540] via-[#1B2CC1] to-[#091540] p-4">
+                                    <img src="{{ $logoUrl }}"
+                                        onerror="this.onerror=null;this.src='{{ asset('logo.png') }}'"
+                                        alt="SciLens AR"
+                                        class="h-20 w-20 object-contain drop-shadow-lg sm:h-24 sm:w-24">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white ring-1 ring-white/25">
+                                        <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"/></svg>
+                                        Play
+                                    </span>
+                                </button>
                             @endif
                         </div>
                     </div>
@@ -76,8 +108,7 @@
         </div>
 
         <p class="mt-6 text-center text-[11px] font-medium text-[#091540]/50">
-            Clips use a phone-shaped frame (9:16). Add MP4s under <code class="rounded bg-slate-100 px-1">public/videos/</code>
-            or set a YouTube id in this partial.
+            Phone-shaped frame (9:16). Fullscreen is disabled. Previews use the SciLens AR icon until you press Play.
         </p>
     </div>
 </section>
