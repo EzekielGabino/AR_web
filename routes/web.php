@@ -33,6 +33,14 @@ use App\Http\Controllers\Admin\AdminDataController;
 // Public / marketing (v2 — single page: hero + overview + login)
 // Old blades live under resources/views(old)/ for reference only.
 // ---------------------------------------------------------------------
+Route::get('/auth/status', function (\Illuminate\Http\Request $request) {
+    $uid = $request->session()->get('auth_uid') ?: $request->session()->get('firebase_uid');
+    return response()->json([
+        'authenticated' => (bool) $uid,
+        'role' => $request->session()->get('user_role'),
+    ]);
+})->name('auth.status');
+
 Route::get('/join/{code}', function (string $code) {
     return redirect()->route('welcome');
 })->where('code', '[A-Za-z0-9]+')->name('join.class');

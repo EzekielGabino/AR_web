@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html data-auth="{{ session('auth_uid') || session('firebase_uid') ? '1' : '0' }}" lang="en" class="h-full">
 
 <head>
     <meta charset="UTF-8">
@@ -50,17 +50,60 @@
 <script>
 (function () {
     const KEY = 'scilens_auth_ping';
+    const wasAuth = document.documentElement.getAttribute('data-auth') === '1';
+
     window.scilensAuthPing = function () {
         try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {}
+        try {
+            if (window.BroadcastChannel) {
+                const bc = new BroadcastChannel('scilens_auth');
+                bc.postMessage({ t: Date.now() });
+                bc.close();
+            }
+        } catch (e) {}
     };
+
     window.addEventListener('storage', function (e) {
         if (e.key === KEY) {
             window.location.reload();
         }
     });
+
+    try {
+        if (window.BroadcastChannel) {
+            const bc = new BroadcastChannel('scilens_auth');
+            bc.onmessage = function () {
+                window.location.reload();
+            };
+        }
+    } catch (e) {}
+
+    let checking = false;
+    async function checkAuth() {
+        if (checking || document.hidden) return;
+        checking = true;
+        try {
+            const res = await fetch(@json(url('/auth/status')), {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const nowAuth = !!data.authenticated;
+            if (nowAuth !== wasAuth) {
+                window.location.reload();
+            }
+        } catch (e) {
+        } finally {
+            checking = false;
+        }
+    }
+    setInterval(checkAuth, 2500);
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) checkAuth();
+    });
 })();
 </script>
-
 @if(session('auth_ping'))
 <script>if (window.scilensAuthPing) window.scilensAuthPing();</script>
 @endif
