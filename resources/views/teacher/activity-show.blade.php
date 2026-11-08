@@ -27,12 +27,12 @@
                     </div>
                     <p class="mt-1 text-xs text-slate-500">
                         <span x-text="activity.labCategory || 'Lab'"></span>
-                        <span x-show="activity.publishedAt"> · Published <span x-text="formatPublishedDate(activity.publishedAt)"></span></span>
+                        <span x-show="activity.publishedAt"> · Published <span x-text="activity.publishedAt ? new Date(activity.publishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : ''"></span></span>
                         <span x-show="activity.dueDate"> · Due <span x-text="activity.dueDate"></span><span x-show="activity.dueTime" x-text="' ' + activity.dueTime"></span></span>
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button type="button" x-show="!isPublished()" @click="publish()" :disabled="publishing"
+                    <button type="button" x-show="!isPublished()" @click="openPublishModal()" :disabled="publishing"
                         class="cursor-pointer rounded-xl bg-[#1B2CC1] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#091540] disabled:opacity-50 transition-colors">
                         <span x-text="publishing ? 'Publishing…' : 'Publish for students'"></span>
                     </button>
@@ -360,10 +360,61 @@
             </div>
 
     </template>
+    {{-- Unpublish confirmation modal --}}
+    <div x-show="unpublishModalOpen" x-cloak
+        class="fixed inset-0 z-[300] flex items-center justify-center bg-[#091540]/70 p-4 backdrop-blur-sm"
+        role="dialog" aria-modal="true">
+        <div class="absolute inset-0" @click="!publishing && (unpublishModalOpen = false)"></div>
+        <div class="relative w-full max-w-md rounded-3xl border border-rose-200 bg-white p-6 shadow-2xl" @click.stop>
+            <h3 class="text-lg font-extrabold text-[#091540]">Unpublish activity?</h3>
+            <p class="mt-2 text-sm font-medium text-[#091540]/75">
+                Students will no longer see this as an active assignment.
+            </p>
+            <div class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-900">
+                All student submissions for this activity will be cleared (including returned work and scores).
+                After you publish again, students must complete and submit the activity from the start.
+            </div>
+            <div class="mt-5 flex flex-wrap justify-end gap-2">
+                <button type="button" @click="unpublishModalOpen = false" :disabled="publishing"
+                    class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold text-[#091540] disabled:opacity-50">Cancel</button>
+                <button type="button" @click="unpublish()" :disabled="publishing"
+                    class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 disabled:opacity-50"
+                    x-text="publishing ? 'Unpublishing…' : 'Unpublish and clear submissions'"></button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Publish confirmation modal --}}
+    <div x-show="publishModalOpen" x-cloak
+        class="fixed inset-0 z-[300] flex items-center justify-center bg-[#091540]/70 p-4 backdrop-blur-sm"
+        role="dialog" aria-modal="true">
+        <div class="absolute inset-0" @click="closePublishModal()"></div>
+        <div class="relative w-full max-w-md rounded-3xl border border-[#7692FF]/40 bg-white p-6 shadow-2xl" @click.stop>
+            <h3 class="text-lg font-extrabold text-[#091540]">Publish activity?</h3>
+            <p class="mt-2 text-sm font-medium text-[#091540]/75">
+                Students in this class will see this assignment and can submit work.
+            </p>
+            <div class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
+                While published, you cannot edit or delete this activity (content, attachments, or details).
+                Unpublish first if you need to change it.
+            </div>
+            <p x-show="publishNoDueConfirm" class="mt-3 text-xs font-bold text-amber-800">
+                No due date is set. You can still publish without a deadline.
+            </p>
+            <div class="mt-5 flex flex-wrap justify-end gap-2">
+                <button type="button" @click="closePublishModal()" :disabled="publishing"
+                    class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold text-[#091540] disabled:opacity-50">Cancel</button>
+                <button type="button" @click="publish()" :disabled="publishing"
+                    class="rounded-xl bg-[#1B2CC1] px-4 py-2 text-xs font-bold text-white shadow disabled:opacity-50"
+                    x-text="publishing ? 'Publishing…' : 'Publish for students'"></button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
-function activityShowPage(config) {
+window.activityShowPage = function activityShowPage(config) {
     return {
             classId: config.classId,
             activityId: config.activityId,
@@ -759,6 +810,16 @@ function activityShowPage(config) {
                     this.publishing = false;
                 }
             },
+            formatPublishedDate(v) {
+                if (!v) return '—';
+                try {
+                    const d = new Date(v);
+                    if (Number.isNaN(d.getTime())) return String(v).slice(0, 10);
+                    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                } catch (e) {
+                    return String(v).slice(0, 10);
+                }
+            },
             formatWhen(v) {
                 if (!v) return '—';
                 try {
@@ -776,56 +837,5 @@ function activityShowPage(config) {
 @push('scripts')
 
     
-    {{-- Unpublish confirmation modal --}}
-    <div x-show="unpublishModalOpen" x-cloak
-        class="fixed inset-0 z-[300] flex items-center justify-center bg-[#091540]/70 p-4 backdrop-blur-sm"
-        role="dialog" aria-modal="true">
-        <div class="absolute inset-0" @click="!publishing && (unpublishModalOpen = false)"></div>
-        <div class="relative w-full max-w-md rounded-3xl border border-rose-200 bg-white p-6 shadow-2xl" @click.stop>
-            <h3 class="text-lg font-extrabold text-[#091540]">Unpublish activity?</h3>
-            <p class="mt-2 text-sm font-medium text-[#091540]/75">
-                Students will no longer see this as an active assignment.
-            </p>
-            <div class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-900">
-                All student submissions for this activity will be cleared (including returned work and scores).
-                After you publish again, students must complete and submit the activity from the start.
-            </div>
-            <div class="mt-5 flex flex-wrap justify-end gap-2">
-                <button type="button" @click="unpublishModalOpen = false" :disabled="publishing"
-                    class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold text-[#091540] disabled:opacity-50">Cancel</button>
-                <button type="button" @click="unpublish()" :disabled="publishing"
-                    class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 disabled:opacity-50"
-                    x-text="publishing ? 'Unpublishing…' : 'Unpublish and clear submissions'"></button>
-            </div>
-        </div>
-    </div>
-
-    {{-- Publish confirmation modal --}}
-    <div x-show="publishModalOpen" x-cloak
-        class="fixed inset-0 z-[300] flex items-center justify-center bg-[#091540]/70 p-4 backdrop-blur-sm"
-        role="dialog" aria-modal="true">
-        <div class="absolute inset-0" @click="closePublishModal()"></div>
-        <div class="relative w-full max-w-md rounded-3xl border border-[#7692FF]/40 bg-white p-6 shadow-2xl" @click.stop>
-            <h3 class="text-lg font-extrabold text-[#091540]">Publish activity?</h3>
-            <p class="mt-2 text-sm font-medium text-[#091540]/75">
-                Students in this class will see this assignment and can submit work.
-            </p>
-            <div class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
-                While published, you cannot edit or delete this activity (content, attachments, or details).
-                Unpublish first if you need to change it.
-            </div>
-            <p x-show="publishNoDueConfirm" class="mt-3 text-xs font-bold text-amber-800">
-                No due date is set. You can still publish without a deadline.
-            </p>
-            <div class="mt-5 flex flex-wrap justify-end gap-2">
-                <button type="button" @click="closePublishModal()" :disabled="publishing"
-                    class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold text-[#091540] disabled:opacity-50">Cancel</button>
-                <button type="button" @click="publish()" :disabled="publishing"
-                    class="rounded-xl bg-[#1B2CC1] px-4 py-2 text-xs font-bold text-white shadow disabled:opacity-50"
-                    x-text="publishing ? 'Publishing…' : 'Publish for students'"></button>
-            </div>
-        </div>
-    </div>
-
 <script type="module" src="{{ asset('js/teacher/classroom.js') }}"></script>
 @endpush
