@@ -543,6 +543,15 @@ class TeacherDataController extends Controller
             return response()->json($this->mapActivity($rows[0]));
         }
 
+        $dueErr = $this->validateDueNotPast(
+            array_key_exists('due_date', $patch) ? ($patch['due_date'] ?? null) : ($rows[0]['due_date'] ?? null),
+            array_key_exists('due_time', $patch) ? ($patch['due_time'] ?? null) : ($rows[0]['due_time'] ?? null),
+            array_key_exists('due_date', $patch) || array_key_exists('due_time', $patch) || (! empty($patch['published']))
+        );
+        if ($dueErr) {
+            return response()->json(['message' => $dueErr], 422);
+        }
+
         $wasPublished = (bool) ($rows[0]['published'] ?? false);
 
         // Unpublishing: clear published_at in the same PATCH
@@ -1136,6 +1145,35 @@ protected function classLabel(string $classId): string
      *
      * @return int Number of rows cleared
      */
+
+    /**
+     * @param  mixed  $dueDate
+     * @param  mixed  $dueTime
+     * @param  bool  $shouldCheck  when false, skip (no due fields touched and not publishing)
+     */
+    protected function validateDueNotPast(mixed $dueDate, mixed $dueTime, bool $shouldCheck): ?string
+    {
+        if (! $shouldCheck) {
+            return null;
+        }
+        $d = is_string($dueDate) ? trim($dueDate) : '';
+        if ($d === '') {
+            return null;
+        }
+        $t = is_string($dueTime) ? trim($dueTime) : '';
+        $iso = $t !== '' ? ($d.' '.$t.':00') : ($d.' 23:59:59');
+        try {
+            $when = \Carbon\Carbon::parse($iso, config('app.timezone') ?: 'UTC');
+        } catch (\Throwable $e) {
+            return 'Invalid due date or time.';
+        }
+        if ($when->lt(now())) {
+            return 'Due date and time cannot be earlier than now.';
+        }
+
+        return null;
+    }
+
     protected function clearActivitySubmissions(string $activityId): int
     {
         $count = 0;

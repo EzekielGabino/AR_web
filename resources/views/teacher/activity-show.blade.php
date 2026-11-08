@@ -735,6 +735,7 @@ window.activityShowPage = function activityShowPage(config) {
                 this.message = '';
                 this.error = '';
                 try {
+                    this.assertDueDateNotPast();
                     const patch = {
                         title: (this.form.title || '').trim(),
                         description: (this.form.description || '').trim(),
@@ -754,6 +755,20 @@ window.activityShowPage = function activityShowPage(config) {
                     this.saving = false;
                 }
             },
+            dueDateTimeIsPast() {
+                const d = (this.form.dueDate || '').trim();
+                if (!d) return false;
+                const t = (this.form.dueTime || '').trim();
+                const iso = t ? (d + 'T' + t + ':00') : (d + 'T23:59:59');
+                const when = new Date(iso);
+                if (Number.isNaN(when.getTime())) return false;
+                return when.getTime() < Date.now();
+            },
+            assertDueDateNotPast() {
+                if (this.dueDateTimeIsPast()) {
+                    throw new Error('Due date and time cannot be earlier than now.');
+                }
+            },
             openPublishModal() {
                 this.publishNoDueConfirm = !this.form.dueDate;
                 this.publishModalOpen = true;
@@ -766,6 +781,7 @@ window.activityShowPage = function activityShowPage(config) {
                 this.error = '';
                 this.message = '';
                 try {
+                    this.assertDueDateNotPast();
                     // Lock max score to quiz length before publish
                     this.form.maxScore = this.derivedMaxScore();
                     await this.saveDetails();

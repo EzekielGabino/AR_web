@@ -34,10 +34,12 @@
             });
         },
         gradeOptions() {
-            const set = new Set();
-            (this.classes || []).forEach((c) => { if (c.grade_level) set.add(c.grade_level); });
-            ['Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'].forEach((g) => set.add(g));
-            return Array.from(set).sort();
+            const allowed = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'];
+            const set = new Set(allowed);
+            (this.classes || []).forEach((c) => {
+                if (c.grade_level && allowed.includes(c.grade_level)) set.add(c.grade_level);
+            });
+            return allowed.filter((g) => set.has(g));
         },
         yearOptions() {
             const set = new Set();
@@ -304,8 +306,6 @@
                             <option>Grade 8</option>
                             <option>Grade 9</option>
                             <option>Grade 10</option>
-                            <option>Grade 11</option>
-                            <option>Grade 12</option>
                         </select>
                     </div>
                     <div>
