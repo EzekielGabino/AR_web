@@ -1160,11 +1160,39 @@ protected function classLabel(string $classId): string
         if ($d === '') {
             return null;
         }
+        // Date-only or full ISO from DB
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $d) !== 1) {
+            return 'Invalid due date or time.';
+        }
+        $datePart = substr($d, 0, 10);
         $t = is_string($dueTime) ? trim($dueTime) : '';
-        $iso = $t !== '' ? ($d.' '.$t.':00') : ($d.' 23:59:59');
-        try {
-            $when = \Carbon\Carbon::parse($iso, config('app.timezone') ?: 'UTC');
-        } catch (\Throwable $e) {
+        if ($t === '' && strlen($d) > 10) {
+            try {
+                $when = \Carbon\Carbon::parse($d, config('app.timezone') ?: 'UTC');
+            } catch (\Throwable $e) {
+                return 'Invalid due date or time.';
+            }
+        } else {
+            if ($t === '') {
+                $t = '23:59:59';
+            } elseif (preg_match('/^\d{1,2}:\d{2}$/', $t) === 1) {
+                $t = $t.':00';
+            } elseif (preg_match('/^\d{1,2}:\d{2}:\d{2}/', $t) === 1) {
+                $t = substr($t, 0, 8);
+            } else {
+                return 'Invalid due date or time.';
+            }
+            try {
+                $when = \Carbon\Carbon::createFromFormat(
+                    'Y-m-d H:i:s',
+                    $datePart.' '.$t,
+                    config('app.timezone') ?: 'UTC'
+                );
+            } catch (\Throwable $e) {
+                return 'Invalid due date or time.';
+            }
+        }
+        if (! $when) {
             return 'Invalid due date or time.';
         }
         if ($when->lt(now())) {

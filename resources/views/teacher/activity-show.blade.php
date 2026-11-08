@@ -756,11 +756,13 @@ window.activityShowPage = function activityShowPage(config) {
                 }
             },
             dueDateTimeIsPast() {
-                const d = (this.form.dueDate || '').trim();
-                if (!d) return false;
-                const t = (this.form.dueTime || '').trim();
-                const iso = t ? (d + 'T' + t + ':00') : (d + 'T23:59:59');
-                const when = new Date(iso);
+                const d = (this.form.dueDate || '').trim().slice(0, 10);
+                if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+                let t = (this.form.dueTime || '').trim();
+                if (!t) t = '23:59:59';
+                else if (/^\d{1,2}:\d{2}$/.test(t)) t = t + ':00';
+                else if (/^\d{1,2}:\d{2}:\d{2}/.test(t)) t = t.slice(0, 8);
+                const when = new Date(d + 'T' + t);
                 if (Number.isNaN(when.getTime())) return false;
                 return when.getTime() < Date.now();
             },
