@@ -586,6 +586,10 @@
                 event.target.value = '';
                 if (!file) return;
                 this.streamError = '';
+                if (file.size > 15 * 1024 * 1024) {
+                    this.streamError = 'File is too large (' + this.formatBytes(file.size) + '). Maximum is 15 MB.';
+                    return;
+                }
                 this.streamUploading = true;
                 try {
                     const meta = await window.TeacherClassroom.uploadAnnouncementFile(this.classId, file);
@@ -626,6 +630,10 @@
                     return;
                 }
 
+                if (file.size > 15 * 1024 * 1024) {
+                    this.tplError = 'File is too large (max 15 MB).';
+                    return;
+                }
                 this.tplUploading = true;
                 try {
                     const meta = await window.TeacherClassroom.uploadActivityAttachment(this.tplActive.id, file);

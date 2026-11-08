@@ -388,6 +388,8 @@ class TeacherDataController extends Controller
         $this->assertClassOwner($request, $classId);
         $request->validate([
             'file' => 'required|file|max:15360|mimes:pdf,doc,docx,png,jpg,jpeg,webp',
+        ], [
+            'file.max' => 'File is too large. Maximum is 15 MB.',
         ]);
         $file = $request->file('file');
         $bucket = (string) config('supabase.storage_bucket_attachments', 'activity-attachments');
@@ -779,6 +781,8 @@ class TeacherDataController extends Controller
 
         $request->validate([
             'file' => 'required|file|max:15360|mimes:pdf,doc,docx,png,jpg,jpeg,webp',
+        ], [
+            'file.max' => 'File is too large. Maximum is 15 MB.',
         ]);
 
         $file = $request->file('file');

@@ -36,7 +36,7 @@
                         class="cursor-pointer rounded-xl bg-[#1B2CC1] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#091540] disabled:opacity-50 transition-colors">
                         <span x-text="publishing ? 'Publishing…' : 'Publish for students'"></span>
                     </button>
-                    <button type="button" x-show="isPublished()" @click="unpublishModalOpen = true" :disabled="publishing"
+                    <button type="button" x-show="isPublished()" @click="openUnpublishModal()" :disabled="publishing"
                         class="cursor-pointer rounded-xl border-[1.5px] border-[#ABD2FA] bg-white px-5 py-2.5 text-xs font-bold text-[#091540] hover:bg-[#ABD2FA]/20 disabled:opacity-50 transition-colors">
                         Unpublish
                     </button>
@@ -364,7 +364,7 @@
     <div x-show="unpublishModalOpen" x-cloak
         class="fixed inset-0 z-[300] flex items-center justify-center bg-[#091540]/70 p-4 backdrop-blur-sm"
         role="dialog" aria-modal="true">
-        <div class="absolute inset-0" @click="!publishing && (unpublishModalOpen = false)"></div>
+        <div class="absolute inset-0" @click="closeUnpublishModal()"></div>
         <div class="relative w-full max-w-md rounded-3xl border border-rose-200 bg-white p-6 shadow-2xl" @click.stop>
             <h3 class="text-lg font-extrabold text-[#091540]">Unpublish activity?</h3>
             <p class="mt-2 text-sm font-medium text-[#091540]/75">
@@ -374,8 +374,10 @@
                 All student submissions for this activity will be cleared (including returned work and scores).
                 After you publish again, students must complete and submit the activity from the start.
             </div>
+            <p x-show="modalError" x-text="modalError" class="mt-3 text-xs font-bold text-rose-600"></p>
+            <p x-show="modalMessage" x-text="modalMessage" class="mt-3 text-xs font-bold text-emerald-600"></p>
             <div class="mt-5 flex flex-wrap justify-end gap-2">
-                <button type="button" @click="unpublishModalOpen = false" :disabled="publishing"
+                <button type="button" @click="closeUnpublishModal()" :disabled="publishing"
                     class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold text-[#091540] disabled:opacity-50">Cancel</button>
                 <button type="button" @click="unpublish()" :disabled="publishing"
                     class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 disabled:opacity-50"
@@ -401,6 +403,8 @@
             <p x-show="publishNoDueConfirm" class="mt-3 text-xs font-bold text-amber-800">
                 No due date is set. You can still publish without a deadline.
             </p>
+            <p x-show="modalError" x-text="modalError" class="mt-3 text-xs font-bold text-rose-600"></p>
+            <p x-show="modalMessage" x-text="modalMessage" class="mt-3 text-xs font-bold text-emerald-600"></p>
             <div class="mt-5 flex flex-wrap justify-end gap-2">
                 <button type="button" @click="closePublishModal()" :disabled="publishing"
                     class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold text-[#091540] disabled:opacity-50">Cancel</button>
@@ -432,6 +436,8 @@ window.activityShowPage = function activityShowPage(config) {
             publishModalOpen: false,
             publishNoDueConfirm: false,
             unpublishModalOpen: false,
+            modalError: '',
+            modalMessage: '',
             // Students bucket UI
             bucketView: 'summary', // summary | list | review
             activeBucket: null,
@@ -485,10 +491,25 @@ window.activityShowPage = function activityShowPage(config) {
                     this.loading = false;
                 }
             },
+            maxAttachmentBytes() { return 15 * 1024 * 1024; },
+            formatFileSize(bytes) {
+                const n = Number(bytes) || 0;
+                if (n < 1024) return n + ' B';
+                if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+                return (n / (1024 * 1024)).toFixed(2) + ' MB';
+            },
+            attachmentsTotalBytes() {
+                const list = (this.activity && this.activity.attachments) || [];
+                return list.reduce((sum, f) => sum + (Number(f.size || f.bytes) || 0), 0);
+            },
             async onActivityFileSelected(event) {
-                const file = event.target?.files?.[0];
+                const file = event.target && event.target.files ? event.target.files[0] : null;
                 event.target.value = '';
                 if (!file || !this.activityId || this.isPublished()) return;
+                if (file.size > this.maxAttachmentBytes()) {
+                    this.error = 'File is too large (' + this.formatFileSize(file.size) + '). Maximum is 15 MB.';
+                    return;
+                }
                 this.attUploading = true;
                 this.error = '';
                 try {
@@ -772,16 +793,34 @@ window.activityShowPage = function activityShowPage(config) {
                 }
             },
             openPublishModal() {
+                this.modalError = '';
+                this.modalMessage = '';
                 this.publishNoDueConfirm = !this.form.dueDate;
                 this.publishModalOpen = true;
             },
             closePublishModal() {
+                if (this.publishing) return;
                 this.publishModalOpen = false;
+                this.modalError = '';
+                this.modalMessage = '';
+            },
+            openUnpublishModal() {
+                this.modalError = '';
+                this.modalMessage = '';
+                this.unpublishModalOpen = true;
+            },
+            closeUnpublishModal() {
+                if (this.publishing) return;
+                this.unpublishModalOpen = false;
+                this.modalError = '';
+                this.modalMessage = '';
             },
             async publish() {
                 this.publishing = true;
                 this.error = '';
                 this.message = '';
+                this.modalError = '';
+                this.modalMessage = '';
                 try {
                     this.assertDueDateNotPast();
                     // Lock max score to quiz length before publish
@@ -797,12 +836,15 @@ window.activityShowPage = function activityShowPage(config) {
                     const res = await window.TeacherClassroom.publishClassActivity(this.activityId, extra);
                     this.activity = Object.assign({}, this.activity, res, extra);
                     this.submissions = await window.TeacherClassroom.fetchActivitySubmissions(this.activityId);
-                    this.publishModalOpen = false;
-                    this.message = 'Published. Students can now take this lab.';
+                    this.modalMessage = 'Published. Students can now take this lab.';
+                    this.message = this.modalMessage;
                     this.panel = 'students';
+                    setTimeout(() => { this.publishModalOpen = false; this.modalMessage = ''; }, 900);
                 } catch (e) {
                     console.error(e);
-                    this.error = e.message || 'Publish failed.';
+                    const msg = e.message || 'Publish failed.';
+                    this.modalError = msg;
+                    this.error = msg;
                 } finally {
                     this.publishing = false;
                 }
@@ -810,20 +852,25 @@ window.activityShowPage = function activityShowPage(config) {
             async unpublish() {
                 this.publishing = true;
                 this.error = '';
+                this.modalError = '';
+                this.modalMessage = '';
                 try {
                     const res = await window.TeacherClassroom.unpublishClassActivity(this.activityId);
                     this.activity = Object.assign({}, this.activity, res, { published: false, status: 'draft', publishedAt: null });
                     this.submissions = [];
                     this.bucketView = 'summary';
                     this.reviewRow = null;
-                    this.unpublishModalOpen = false;
                     const n = res && res.submissionsCleared != null ? res.submissionsCleared : null;
-                    this.message = n != null
-                        ? ('Moved back to draft. ' + n + ' submission(s) cleared — students must submit again after re-publish.')
+                    this.modalMessage = n != null
+                        ? ('Moved back to draft. ' + n + ' submission(s) cleared. Students must submit again after re-publish.')
                         : 'Moved back to draft. Student submissions were cleared.';
+                    this.message = this.modalMessage;
                     this.panel = 'details';
+                    setTimeout(() => { this.unpublishModalOpen = false; this.modalMessage = ''; }, 1200);
                 } catch (e) {
-                    this.error = e.message || 'Unpublish failed.';
+                    const msg = e.message || 'Unpublish failed.';
+                    this.modalError = msg;
+                    this.error = msg;
                 } finally {
                     this.publishing = false;
                 }
