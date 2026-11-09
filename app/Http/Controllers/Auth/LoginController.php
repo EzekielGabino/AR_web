@@ -155,7 +155,10 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        // Land on public home; flash so other tabs pick up signed-out state
+        return redirect()->route('welcome')
+            ->with('auth_ping', true)
+            ->with('status', 'Signed out.');
     }
 
     /**

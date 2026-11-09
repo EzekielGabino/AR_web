@@ -114,7 +114,7 @@
                             class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-white hover:bg-white/10">
                             Change password
                         </button>
-                        <form method="POST" action="{{ route('logout') }}" onsubmit="if (window.scilensAuthPing) window.scilensAuthPing()">
+                        <form method="POST" action="{{ route('logout') }}" >
                             @csrf
                             <button type="submit"
                                 class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-rose-300 hover:bg-rose-500/10">
