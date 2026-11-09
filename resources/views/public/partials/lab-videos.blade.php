@@ -1,5 +1,5 @@
 {{-- Student AR lab previews — phone frame (9:16), SciLens poster, phone-sized fullscreen overlay --}}
-<section id="see-the-lab" class="scroll-mt-24 relative overflow-hidden rounded-3xl border border-[#ABD2FA]/40 bg-white/90 px-4 py-14 shadow-sm sm:px-8 sm:py-16">
+<section id="see-the-lab" class="scroll-mt-24 relative overflow-visible rounded-3xl border border-[#ABD2FA]/40 bg-white/90 px-4 py-14 shadow-sm sm:px-8 sm:py-16">
     <div class="relative mx-auto max-w-6xl"
         x-data="{
             playing: null,
@@ -86,7 +86,7 @@
 
         <div class="mt-10 grid grid-cols-1 justify-items-center gap-8 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($clips as $i => $clip)
-                <article class="flex w-full max-w-[280px] flex-col overflow-hidden rounded-[1.75rem] border border-[#ABD2FA]/50 bg-slate-50/80 shadow-md shadow-[#1B2CC1]/5">
+                <article class="flex w-full max-w-[340px] flex-col overflow-hidden rounded-[1.75rem] border border-[#ABD2FA]/50 bg-slate-50/80 shadow-md shadow-[#1B2CC1]/5">
                     <div class="bg-[#091540] px-3 pt-3">
                         <div class="mx-auto mb-2 h-1.5 w-16 rounded-full bg-white/20"></div>
                         <div class="relative mx-auto aspect-[9/16] w-full overflow-hidden rounded-xl bg-[#091540]">
@@ -106,7 +106,7 @@
                             @else
                                 <video
                                     x-ref="vid{{ $i }}"
-                                    class="absolute inset-0 h-full w-full object-cover"
+                                    class="absolute inset-0 h-full w-full object-contain bg-black"
                                     playsinline
                                     preload="none"
                                     controlslist="nofullscreen nodownload noremoteplayback"
@@ -167,14 +167,14 @@
                 class="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 p-3 sm:p-6"
                 role="dialog" aria-modal="true">
                 <div class="absolute inset-0" @click="closeFs()"></div>
-                <div class="relative flex h-full max-h-[96vh] w-full max-w-[min(100%,420px)] flex-col items-center justify-center">
+                <div class="relative flex h-full max-h-[98vh] w-full max-w-[min(100%,480px)] flex-col items-center justify-center">
                     <button type="button" @click="closeFs()"
                         class="absolute right-0 top-0 z-20 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/20">
                         Close
                     </button>
                     {{-- Phone bezel fills height while keeping 9:16 --}}
-                    <div class="relative flex h-full max-h-[92vh] w-full items-center justify-center">
-                        <div class="relative aspect-[9/16] h-full max-h-[92vh] w-auto max-w-full overflow-hidden rounded-[1.75rem] border border-white/15 bg-[#091540] shadow-2xl shadow-black/60">
+                    <div class="relative flex h-full max-h-[96vh] w-full items-center justify-center">
+                        <div class="relative aspect-[9/16] h-full max-h-[96vh] w-auto max-w-full overflow-hidden rounded-[1.75rem] border border-white/15 bg-[#091540] shadow-2xl shadow-black/60">
                             <div class="flex h-full flex-col p-2 sm:p-3">
                                 <div class="mx-auto mb-1.5 h-1.5 w-14 shrink-0 rounded-full bg-white/20"></div>
                                 <div class="relative min-h-0 flex-1 overflow-hidden rounded-xl bg-black">
@@ -191,7 +191,7 @@
                                             <video
                                                 x-ref="fsvid{{ $i }}"
                                                 x-show="fs === {{ $i }}"
-                                                class="absolute inset-0 h-full w-full object-cover"
+                                                class="absolute inset-0 h-full w-full object-contain bg-black"
                                                 playsinline
                                                 controls
                                                 controlslist="nofullscreen nodownload noremoteplayback"
