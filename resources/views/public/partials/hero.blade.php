@@ -28,7 +28,7 @@
                 class="inline-flex items-center justify-center rounded-2xl bg-[#1B2CC1] px-6 py-3.5 text-xs font-bold text-white shadow-lg shadow-[#1B2CC1]/25 transition-all duration-200 hover:bg-[#1B2CC1]/90 hover:shadow-xl hover:shadow-[#1B2CC1]/35 active:scale-[0.98]">
                 Sign in to dashboard
             </a>
-            <a href="https://drive.google.com/file/d/15KBtw6O_EJwsXAbTINS2iOp5ymcK4cyA/view?usp=sharing"
+            <a href="https://drive.google.com/file/d/1uwVC_1tRWjXGCxhMUMHUNVBg9riQlFal/view?usp=sharing"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#1B2CC1]/40 bg-[#ABD2FA]/25 px-6 py-3.5 text-xs font-bold text-[#091540] transition-all duration-200 hover:border-[#1B2CC1] hover:bg-[#ABD2FA]/45 active:scale-[0.98]">
