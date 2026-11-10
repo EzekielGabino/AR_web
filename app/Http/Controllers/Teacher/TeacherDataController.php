@@ -244,6 +244,44 @@ class TeacherDataController extends Controller
         return response()->json(['ok' => true, 'status' => 'rejected']);
     }
 
+    /**
+     * Remove an enrolled student from the class (teacher only).
+     */
+    public function removeMember(Request $request, string $classId, string $userId)
+    {
+        $this->assertClassOwner($request, $classId);
+
+        $resp = $this->supabase->service()->delete(
+            '/rest/v1/class_members?class_id=eq.'.$classId.'&user_id=eq.'.$userId
+        );
+        if (! $resp->successful()) {
+            return response()->json([
+                'message' => 'Could not remove student: '.$resp->body(),
+            ], 500);
+        }
+
+        // Detach classroom on profile if still pointing at this class
+        try {
+            $profiles = $this->db->get('profiles', [
+                'id' => 'eq.'.$userId,
+                'select' => 'id,classroom_id',
+                'limit' => 1,
+            ]);
+            if ($profiles && ($profiles[0]['classroom_id'] ?? null) === $classId) {
+                $this->db->update('profiles', 'id', $userId, [
+                    'classroom_id' => null,
+                    'classroom_name' => null,
+                    'classroom_access_code' => null,
+                    'classroom_joined_at' => null,
+                ]);
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return response()->json(['ok' => true, 'status' => 'removed']);
+    }
+
     public function storeClass(Request $request)
     {
         $uid = $this->uid($request);

@@ -242,6 +242,13 @@ export async function rejectMember(classId, userId) {
     });
 }
 
+export async function removeMember(classId, userId) {
+    return api(`/api/teacher/classes/${classId}/members/${userId}/remove`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+    });
+}
+
 window.TeacherClassroom = {
     loadClass,
     fetchAnnouncements,
@@ -266,4 +273,5 @@ window.TeacherClassroom = {
     deleteActivityAttachment,
     approveMember,
     rejectMember,
+    removeMember,
 };

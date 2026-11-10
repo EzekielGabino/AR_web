@@ -74,6 +74,12 @@
                         <p class="truncate text-xs font-bold text-[#091540]" x-text="studentLabel(s)"></p>
                         <p class="mt-0.5 truncate text-[11px] font-medium text-[#091540]/60" x-text="studentSub(s)"></p>
                     </div>
+                    <button type="button"
+                        @click="removeStudent(s)"
+                        :disabled="memberActionUid === s.uid"
+                        class="cursor-pointer shrink-0 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50">
+                        <span x-text="memberActionUid === s.uid ? 'Removing…' : 'Remove'"></span>
+                    </button>
                 </div>
             </template>
         </div>

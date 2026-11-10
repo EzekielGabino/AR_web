@@ -1121,6 +1121,20 @@
                     this.memberActionUid = null;
                 }
             },
+            async removeStudent(s) {
+                if (!s?.uid || this.memberActionUid) return;
+                const label = this.studentLabel(s);
+                if (!confirm('Remove ' + label + ' from this class? They will need a new join request to return.')) return;
+                this.memberActionUid = s.uid;
+                try {
+                    await window.TeacherClassroom.removeMember(this.classId, s.uid);
+                    await this.refreshClass();
+                } catch (e) {
+                    alert(e.message || 'Could not remove student.');
+                } finally {
+                    this.memberActionUid = null;
+                }
+            },
             studentLabel(s) {
                 if (!s) return 'Student';
                 if (typeof s === 'string') return s;

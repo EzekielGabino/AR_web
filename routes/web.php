@@ -120,6 +120,7 @@ Route::middleware([EnsureFirebaseSessionIsValid::class])->group(function () {
             Route::get('/classes/{id}', [TeacherDataController::class, 'showClass']);
             Route::post('/classes/{classId}/members/{userId}/approve', [TeacherDataController::class, 'approveMember']);
             Route::post('/classes/{classId}/members/{userId}/reject', [TeacherDataController::class, 'rejectMember']);
+            Route::post('/classes/{classId}/members/{userId}/remove', [TeacherDataController::class, 'removeMember']);
             Route::patch('/classes/{id}', [TeacherDataController::class, 'updateClass']);
             Route::delete('/classes/{id}', [TeacherDataController::class, 'destroyClass']);
 
