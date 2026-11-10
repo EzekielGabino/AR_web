@@ -1,7 +1,7 @@
 {{-- Main View Template --}}
 @extends('layouts.public')
 
-@section('title', 'SciLens AR — Teacher Portal')
+@section('title', 'SciLens AR - Teacher Portal')
 
 @section('content')
 <div class="min-h-screen bg-slate-50 font-sans text-[#091540] selection:bg-[#ABD2FA] selection:text-[#091540] relative">
@@ -45,7 +45,7 @@
                     <span>Educational Research</span>
                 </div>
                 <p class="text-xs md:text-sm font-medium tracking-wide text-slate-300">
-                    © {{ date('Y') }} SciLens AR. Manaoag National High School — STE Program Research Project.
+                    © {{ date('Y') }} SciLens AR. Manaoag National High School Junior High Program Research Project.
                 </p>
             </div>
         </footer>

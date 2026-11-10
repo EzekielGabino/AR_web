@@ -19,7 +19,7 @@
         {{-- Subtitle --}}
         <p class="mx-auto mt-5 max-w-2xl text-sm font-medium leading-relaxed text-[#091540]/75 sm:text-base">
             SciLens AR helps educators create classes, publish guided AR chemistry labs,
-            and review student work — built for Manaoag National High School STE.
+            and review student work, built for Manaoag National High School Junior High.
         </p>
 
         {{-- Call to Action Buttons --}}

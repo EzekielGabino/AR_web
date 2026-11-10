@@ -52,10 +52,24 @@
                                 class="w-full rounded-2xl border-[1.5px] border-[#ABD2FA] bg-white px-4 py-3 text-xs font-bold text-[#091540] placeholder:text-[#091540]/40 focus:border-[#1B2CC1] focus:outline-none focus:ring-4 focus:ring-[#7692FF]/20 disabled:bg-[#ABD2FA]/10 transition-all"></textarea>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#1B2CC1]">Safety tips</label>
-                            <textarea x-model="tplForm.safetyTips" rows="2" placeholder="Wear goggles. Do not taste chemicals."
+                            <label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#1B2CC1]">Safety precautions</label>
+                            <p class="mb-2 text-[11px] font-medium text-[#091540]/60">Select the warnings that apply. Add a short custom note if needed.</p>
+                            <div class="space-y-2 rounded-2xl border border-[#ABD2FA]/60 bg-[#ABD2FA]/10 p-3">
+                                <template x-for="opt in safetyOptions" :key="opt">
+                                    <label class="flex cursor-pointer items-start gap-2 rounded-xl px-2 py-1.5 hover:bg-white/70"
+                                        :class="tplReadOnly() && 'pointer-events-none opacity-70'">
+                                        <input type="checkbox" class="mt-0.5 rounded border-[#ABD2FA] text-[#1B2CC1] focus:ring-[#7692FF]"
+                                            :checked="!!safetySelected[opt]"
+                                            @change="safetySelected[opt] = $event.target.checked; composeSafetyTips()"
+                                            :disabled="tplReadOnly()">
+                                        <span class="text-xs font-semibold text-[#091540]" x-text="opt"></span>
+                                    </label>
+                                </template>
+                            </div>
+                            <textarea x-model="safetyCustom" rows="2" placeholder="Optional custom note"
                                 :disabled="tplReadOnly()"
-                                class="w-full rounded-2xl border-[1.5px] border-[#ABD2FA] bg-white px-4 py-3 text-xs font-bold text-[#091540] placeholder:text-[#091540]/40 focus:border-[#1B2CC1] focus:outline-none focus:ring-4 focus:ring-[#7692FF]/20 disabled:bg-[#ABD2FA]/10 transition-all"></textarea>
+                                @input="composeSafetyTips()"
+                                class="mt-2 w-full rounded-2xl border-[1.5px] border-[#ABD2FA] bg-white px-4 py-3 text-xs font-bold text-[#091540] placeholder:text-[#091540]/40 focus:border-[#1B2CC1] focus:outline-none focus:ring-4 focus:ring-[#7692FF]/20 disabled:bg-[#ABD2FA]/10 transition-all"></textarea>
                         </div>
 
                         <div class="border-t border-[#ABD2FA]/40 pt-4" x-show="tplModal === 'edit-lab'">
@@ -397,7 +411,11 @@
                         x-text="tplModal === 'edit-lab' ? 'Cancel' : 'Close'"></button>
                     <button type="button" x-show="tplModal === 'edit-lab'" @click="saveLabContent()"
                         :disabled="tplSaving || !tplForm.title.trim()"
-                        class="cursor-pointer rounded-xl bg-[#1B2CC1] px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#091540] disabled:opacity-50 transition-colors">
+                        class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#1B2CC1] px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#091540] disabled:opacity-50 transition-colors">
+                        <svg x-show="tplSaving" x-cloak class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
                         <span x-text="tplSaving ? 'Saving…' : 'Save content'"></span>
                     </button>
                 </div>

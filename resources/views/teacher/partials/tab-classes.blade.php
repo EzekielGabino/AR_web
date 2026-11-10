@@ -293,7 +293,7 @@
                 <div>
                     <label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#091540]/70">Section name</label>
                     <input type="text" x-model="form.section_name" required
-                        placeholder="e.g. STE 8 — Einstein"
+                        placeholder="e.g. Junior High 8 - Einstein"
                         class="w-full rounded-2xl border-[1.5px] border-[#ABD2FA]/80 bg-slate-50/50 px-4 py-3 text-xs font-bold text-[#091540] placeholder:text-slate-400 focus:border-[#1B2CC1] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#7692FF]/20 transition-all">
                 </div>
 
@@ -337,7 +337,11 @@
                 <button type="button"
                     @click="modal === 'edit' ? submitEdit() : submitCreate()"
                     :disabled="saving || !form.section_name.trim() || !(form.academic_year || '').trim()"
-                    class="cursor-pointer rounded-2xl bg-[#1B2CC1] px-6 py-3 text-xs font-bold text-white shadow-md shadow-[#1B2CC1]/20 transition-all hover:bg-[#1B2CC1]/90 disabled:opacity-50">
+                    class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#1B2CC1] px-6 py-3 text-xs font-bold text-white shadow-md shadow-[#1B2CC1]/20 transition-all hover:bg-[#1B2CC1]/90 disabled:opacity-50">
+                    <svg x-show="saving" x-cloak class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
                     <span x-text="saving ? 'Saving…' : (modal === 'edit' ? 'Save changes' : 'Create')"></span>
                 </button>
             </div>

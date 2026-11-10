@@ -43,9 +43,9 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 00-.491 6.347A48.62 48.62 0 0112 20.904a48.62 48.62 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.636 50.636 0 00-2.658-.813A59.906 59.906 0 0112 3.493a59.903 59.903 0 0110.399 5.84 51.39 51.39 0 00-2.658.814m-15.482 0A50.717 50.717 0 0112 13.489a50.702 50.702 0 017.74-3.342" />
                     </svg>
                 </div>
-                <h3 class="mt-5 text-base font-bold text-[#091540] transition-colors group-hover:text-[#1B2CC1]">STE Program</h3>
+                <h3 class="mt-5 text-base font-bold text-[#091540] transition-colors group-hover:text-[#1B2CC1]">Junior High Program</h3>
                 <p class="mt-2 text-xs font-medium leading-relaxed text-[#091540]/70">
-                    Developed under the Manaoag National High School Science, Technology, and Engineering program initiative.
+                    Developed under the Manaoag National High School Junior High program initiative.
                 </p>
             </div>
 

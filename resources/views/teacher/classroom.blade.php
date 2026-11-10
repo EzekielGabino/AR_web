@@ -86,6 +86,40 @@
             },
             elementTypes: ['liquid', 'granule', 'solid'],
             elementRoles: ['Neutral', 'Acid', 'Base', 'Salt', 'Indicator', 'Carbonate'],
+            safetyOptions: [
+                'Wear safety goggles at all times',
+                'Wear a lab coat or apron',
+                'Wear protective gloves when handling chemicals',
+                'Tie back long hair and secure loose clothing',
+                'Do not taste or smell chemicals directly',
+                'Do not eat or drink in the lab',
+                'Handle glassware carefully; report breaks',
+                'Keep flammable materials away from open flames',
+                'Work in a well-ventilated area or under a fume hood',
+                'Know the location of the eyewash and fire extinguisher',
+                'Wash hands after the experiment',
+                'Dispose of waste in the correct container',
+            ],
+            safetySelected: {},
+            safetyCustom: '',
+            syncSafetyUi() {
+                const tips = String(this.tplForm.safetyTips || '')
+                    .split(/\n|;/)
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                const selected = {};
+                (this.safetyOptions || []).forEach((o) => {
+                    selected[o] = tips.includes(o);
+                });
+                this.safetySelected = selected;
+                const known = new Set(this.safetyOptions || []);
+                this.safetyCustom = tips.filter((t) => !known.has(t)).join('\n');
+            },
+            composeSafetyTips() {
+                const picked = (this.safetyOptions || []).filter((o) => this.safetySelected[o]);
+                const custom = (this.safetyCustom || '').trim();
+                this.tplForm.safetyTips = [...picked, ...(custom ? [custom] : [])].join('\n');
+            },
             /**
              * Required elements by lab category.
              * roles / types: each must appear at least once.
@@ -162,8 +196,8 @@
                         const added = next - prev;
                         this.showJoinToast(
                             added === 1
-                                ? 'New join request — open Students to approve.'
-                                : (added + ' new join requests — open Students to approve.')
+                                ? 'New join request. Open Students to approve.'
+                                : (added + ' new join requests. Open Students to approve.')
                         );
                         // Optional: soft highlight by switching is not forced; teacher stays on current tab
                     }
@@ -321,6 +355,7 @@
                         ];
                     }
                 });
+                this.syncSafetyUi();
             },
             openTplView(t) {
                 this.loadTplForm(t);
@@ -334,6 +369,7 @@
                 this.tplModal = 'edit-lab';
             },
             async saveLabContent() {
+                this.composeSafetyTips();
                 if (this.tplModal !== 'edit-lab' || !this.tplActive) return;
                 this.tplSaving = true;
                 this.tplError = '';
@@ -371,7 +407,9 @@
                         labExperiment: {
                             labCategory: form.labCategory,
                             materials,
-                            safetyPrecautions: form.safetyTips ? [form.safetyTips] : [],
+                            safetyPrecautions: form.safetyTips
+                                ? form.safetyTips.split(/\n/).map((s) => s.trim()).filter(Boolean)
+                                : [],
                             apparatus: form.apparatus,
                             elements: form.elements,
                             steps: form.steps,

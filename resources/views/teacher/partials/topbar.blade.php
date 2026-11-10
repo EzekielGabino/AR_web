@@ -202,7 +202,7 @@
                     <p class="text-xs leading-relaxed text-[#ABD2FA]/90">
                         Create a class with a section name and grade. Each class gets an
                         <span class="font-bold text-white">access code</span> (and QR) students use in the mobile app.
-                        Join requests appear under <span class="font-bold text-white">Students</span> — approve them before they can see stream and activities.
+                        Join requests appear under <span class="font-bold text-white">Students</span>. Approve them before they can see stream and activities.
                     </p>
                 </div>
                 <div x-show="helpStep === 1" class="space-y-3">
