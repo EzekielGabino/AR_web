@@ -289,7 +289,7 @@ class AdminDataController extends Controller
         $rows = $this->db->get('profiles', [
             'role' => 'eq.student',
             'order' => 'display_name.asc',
-            'select' => 'id,email,display_name,photo_url,role,created_at',
+            'select' => 'id,email,display_name,photo_url,role,classroom_id,classroom_name,created_at',
         ]);
 
         return response()->json(array_map(fn ($p) => [
@@ -298,8 +298,194 @@ class AdminDataController extends Controller
             'display_name' => $p['display_name'] ?? 'Student',
             'photo_url' => $p['photo_url'] ?? null,
             'role' => $p['role'] ?? 'student',
+            'classroom_id' => $p['classroom_id'] ?? null,
+            'classroom_name' => $p['classroom_name'] ?? null,
             'created_at' => $p['created_at'] ?? null,
         ], $rows));
+    }
+
+    /**
+     * Students with no approved class membership and no classroom_id on profile.
+     */
+    public function listUnassignedStudents()
+    {
+        $rows = $this->db->get('profiles', [
+            'role' => 'eq.student',
+            'order' => 'display_name.asc',
+            'select' => 'id,email,display_name,photo_url,role,classroom_id,classroom_name,created_at',
+        ]);
+
+        $assigned = [];
+        try {
+            $members = $this->db->get('class_members', [
+                'status' => 'eq.approved',
+                'select' => 'user_id,role',
+            ]);
+            foreach ($members as $m) {
+                $role = strtolower((string) ($m['role'] ?? 'student'));
+                if (in_array($role, ['teacher', 'co_teacher'], true)) {
+                    continue;
+                }
+                $uid = $m['user_id'] ?? null;
+                if ($uid) {
+                    $assigned[$uid] = true;
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        $out = [];
+        foreach ($rows as $p) {
+            $id = $p['id'] ?? null;
+            if (! $id) {
+                continue;
+            }
+            $classroomId = $p['classroom_id'] ?? null;
+            if ($classroomId !== null && $classroomId !== '') {
+                continue;
+            }
+            if (isset($assigned[$id])) {
+                continue;
+            }
+            $out[] = [
+                'id' => $id,
+                'email' => $p['email'] ?? '',
+                'display_name' => $p['display_name'] ?? 'Student',
+                'photo_url' => $p['photo_url'] ?? null,
+                'role' => $p['role'] ?? 'student',
+                'created_at' => $p['created_at'] ?? null,
+            ];
+        }
+
+        return response()->json($out);
+    }
+
+    public function storeClass(Request $request)
+    {
+        $data = $request->validate([
+            'teacher_id' => 'required|string',
+            'section_name' => 'required|string|max:255',
+            'grade_level' => 'nullable|string|max:64',
+            'academic_year' => 'nullable|string|max:32',
+            'subject' => 'nullable|string|max:128',
+            'access_code' => 'nullable|string|max:32',
+        ]);
+
+        $teacherRows = $this->db->get('profiles', [
+            'id' => 'eq.'.$data['teacher_id'],
+            'limit' => 1,
+            'select' => 'id,role',
+        ]);
+        if (! $teacherRows) {
+            return response()->json(['message' => 'Teacher not found.'], 404);
+        }
+        $role = strtolower((string) ($teacherRows[0]['role'] ?? ''));
+        if (! in_array($role, ['teacher', 'educator'], true)) {
+            return response()->json(['message' => 'Profile is not a teacher.'], 422);
+        }
+
+        $code = strtoupper(trim($data['access_code'] ?? ''));
+        if ($code === '') {
+            $code = $this->generateAccessCode();
+        }
+
+        $row = $this->db->insert('classes', [
+            'teacher_id' => $data['teacher_id'],
+            'section_name' => $data['section_name'],
+            'grade_level' => $data['grade_level'] ?? 'Grade 8',
+            'academic_year' => $data['academic_year'] ?? null,
+            'subject' => $data['subject'] ?? '',
+            'access_code' => $code,
+        ]);
+
+        return response()->json($this->mapClass(is_array($row) ? $row : array_merge($data, [
+            'id' => is_array($row) ? ($row['id'] ?? null) : null,
+            'access_code' => $code,
+        ])), 201);
+    }
+
+    public function updateClass(Request $request, string $id)
+    {
+        $existing = $this->db->get('classes', ['id' => 'eq.'.$id, 'limit' => 1]);
+        if (! $existing) {
+            return response()->json(['message' => 'Class not found.'], 404);
+        }
+
+        $data = $request->validate([
+            'section_name' => 'required|string|max:255',
+            'grade_level' => 'nullable|string|max:64',
+            'academic_year' => 'nullable|string|max:32',
+            'subject' => 'nullable|string|max:128',
+            'access_code' => 'nullable|string|max:32',
+            'teacher_id' => 'nullable|string',
+        ]);
+
+        $code = strtoupper(trim($data['access_code'] ?? $existing[0]['access_code'] ?? ''));
+        $patch = [
+            'section_name' => $data['section_name'],
+            'grade_level' => $data['grade_level'] ?? 'Grade 8',
+            'academic_year' => $data['academic_year'] ?? ($existing[0]['academic_year'] ?? null),
+            'subject' => $data['subject'] ?? '',
+            'access_code' => $code,
+        ];
+        if (! empty($data['teacher_id'])) {
+            $patch['teacher_id'] = $data['teacher_id'];
+        }
+
+        $row = $this->db->update('classes', 'id', $id, $patch);
+
+        return response()->json($this->mapClass($row ?? array_merge($existing[0], $patch)));
+    }
+
+    public function destroyClass(string $id)
+    {
+        $existing = $this->db->get('classes', ['id' => 'eq.'.$id, 'limit' => 1]);
+        if (! $existing) {
+            return response()->json(['message' => 'Class not found.'], 404);
+        }
+
+        try {
+            $members = $this->db->get('class_members', [
+                'class_id' => 'eq.'.$id,
+                'select' => 'id,user_id',
+            ]);
+            foreach ($members as $m) {
+                if (! empty($m['id'])) {
+                    $this->db->delete('class_members', 'id', $m['id']);
+                }
+                $uid = $m['user_id'] ?? null;
+                if ($uid) {
+                    try {
+                        $this->db->update('profiles', 'id', $uid, [
+                            'classroom_id' => null,
+                            'classroom_name' => null,
+                            'classroom_access_code' => null,
+                            'classroom_joined_at' => null,
+                        ]);
+                    } catch (Throwable $e) {
+                        report($e);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        $this->db->delete('classes', 'id', $id);
+
+        return response()->json(['ok' => true]);
+    }
+
+    protected function generateAccessCode(): string
+    {
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $code = '';
+        for ($i = 0; $i < 6; $i++) {
+            $code .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+
+        return $code;
     }
 
     public function createUser(Request $request)

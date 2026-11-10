@@ -30,6 +30,21 @@ export async function showTeacher(id) {
 export async function listStudents() {
     return api('/api/admin/students');
 }
+export async function listUnassignedStudents() {
+    return api('/api/admin/students/unassigned');
+}
+export async function createClass(body) {
+    return api('/api/admin/classes', { method: 'POST', body: JSON.stringify(body) });
+}
+export async function updateClass(id, body) {
+    return api('/api/admin/classes/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+    });
+}
+export async function deleteClass(id) {
+    return api('/api/admin/classes/' + encodeURIComponent(id), { method: 'DELETE' });
+}
 export async function createUser(body) {
     return api('/api/admin/users', { method: 'POST', body: JSON.stringify(body) });
 }
@@ -79,9 +94,13 @@ window.AdminApi = {
     listTeachers,
     showTeacher,
     listStudents,
+    listUnassignedStudents,
     createUser,
     updateUserRole,
     deleteUser,
+    createClass,
+    updateClass,
+    deleteClass,
     classStudents,
     addClassStudent,
     removeClassStudent,

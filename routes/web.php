@@ -96,9 +96,13 @@ Route::middleware([EnsureFirebaseSessionIsValid::class])->group(function () {
             Route::get('/teachers', [AdminDataController::class, 'listTeachers']);
             Route::get('/teachers/{id}', [AdminDataController::class, 'showTeacher']);
             Route::get('/students', [AdminDataController::class, 'listStudents']);
+            Route::get('/students/unassigned', [AdminDataController::class, 'listUnassignedStudents']);
             Route::post('/users', [AdminDataController::class, 'createUser']);
             Route::patch('/users/{id}/role', [AdminDataController::class, 'updateUserRole']);
             Route::delete('/users/{id}', [AdminDataController::class, 'deleteUser']);
+            Route::post('/classes', [AdminDataController::class, 'storeClass']);
+            Route::patch('/classes/{id}', [AdminDataController::class, 'updateClass']);
+            Route::delete('/classes/{id}', [AdminDataController::class, 'destroyClass']);
             Route::get('/classes/{classId}/students', [AdminDataController::class, 'classStudents']);
             Route::post('/classes/{classId}/students', [AdminDataController::class, 'addClassStudent']);
             Route::delete('/classes/{classId}/students/{userId}', [AdminDataController::class, 'removeClassStudent']);

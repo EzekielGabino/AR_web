@@ -14,11 +14,11 @@
         </div>
 
         <nav class="flex flex-wrap gap-2">
-            <template x-for="t in ['teachers','templates']" :key="t">
-                <button type="button" @click="tab = t"
-                    class="rounded-2xl px-4 py-2.5 text-xs font-bold capitalize transition"
-                    :class="tab === t ? 'bg-[#1B2CC1] text-white shadow' : 'bg-white border border-[#ABD2FA] text-[#091540]/70'"
-                    x-text="t"></button>
+            <template x-for="t in tabs" :key="t.id">
+                <button type="button" @click="tab = t.id"
+                    class="rounded-2xl px-4 py-2.5 text-xs font-bold transition"
+                    :class="tab === t.id ? 'bg-[#1B2CC1] text-white shadow' : 'bg-white border border-[#ABD2FA] text-[#091540]/70'"
+                    x-text="t.label"></button>
             </template>
         </nav>
 
@@ -63,7 +63,41 @@
             </div>
         </div>
 
-        
+        {{-- Unassigned students --}}
+        <div x-show="tab === 'unassigned'" class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-black">Unassigned students</h2>
+                    <p class="text-xs font-medium text-slate-500">Students with no class on their profile and no approved membership.</p>
+                </div>
+                <button type="button" @click="loadUnassigned()" class="text-xs font-bold text-[#1B2CC1]">Refresh</button>
+            </div>
+            <div x-show="loadingUnassigned" class="rounded-2xl border bg-white p-6 text-center text-xs text-slate-500">Loading…</div>
+            <p x-show="!loadingUnassigned && !unassigned.length" class="rounded-2xl border border-dashed border-[#ABD2FA] bg-white p-6 text-center text-xs text-slate-500">
+                No unassigned students.
+            </p>
+            <div class="space-y-2">
+                <template x-for="u in unassigned" :key="u.id">
+                    <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#ABD2FA]/50 bg-white p-4 shadow-sm">
+                        <div class="min-w-0">
+                            <p class="text-sm font-black" x-text="u.display_name"></p>
+                            <p class="text-xs text-slate-500" x-text="u.email"></p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select class="rounded-xl border border-[#ABD2FA] px-2 py-1.5 text-xs font-bold"
+                                :value="u.role"
+                                @change="changeRole(u, $event.target.value)">
+                                <option value="student">student</option>
+                                <option value="teacher">teacher</option>
+                                <option value="educator">educator</option>
+                                <option value="admin">admin</option>
+                            </select>
+                            <button type="button" @click="removeUser(u)" class="rounded-xl border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600">Delete</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
 
         {{-- Templates --}}
         <div x-show="tab === 'templates'" class="space-y-4">
@@ -139,13 +173,19 @@
 <script>
 function adminDashboard() {
     const tabParam = new URLSearchParams(window.location.search).get('tab') || 'teachers';
+    const allowed = ['teachers', 'unassigned', 'templates'];
     return {
-        tab: tabParam === 'templates' ? 'templates' : 'teachers',
+        tabs: [
+            { id: 'teachers', label: 'Teachers' },
+            { id: 'unassigned', label: 'Unassigned students' },
+            { id: 'templates', label: 'Templates' },
+        ],
+        tab: allowed.includes(tabParam) ? tabParam : 'teachers',
         teachers: [],
-        students: [],
+        unassigned: [],
         templates: [],
         loadingTeachers: false,
-        loadingStudents: false,
+        loadingUnassigned: false,
         loadingTemplates: false,
         error: '',
         message: '',
@@ -155,11 +195,12 @@ function adminDashboard() {
         userForm: { email: '', password: '', display_name: '', role: 'teacher' },
         async init() {
             while (!window.AdminApi) await new Promise(r => setTimeout(r, 40));
-            if (this.tab === 'students') await this.loadStudents();
+            if (this.tab === 'unassigned') await this.loadUnassigned();
             else if (this.tab === 'templates') await this.loadTemplates();
             else await this.loadTeachers();
             this.$watch('tab', (v) => {
                 if (v === 'teachers' && !this.teachers.length) this.loadTeachers();
+                if (v === 'unassigned') this.loadUnassigned();
                 if (v === 'templates' && !this.templates.length) this.loadTemplates();
             });
         },
@@ -169,11 +210,11 @@ function adminDashboard() {
             catch (e) { this.error = e.message; }
             finally { this.loadingTeachers = false; }
         },
-        async loadStudents() {
-            this.loadingStudents = true; this.error = '';
-            try { this.students = await window.AdminApi.listStudents(); }
+        async loadUnassigned() {
+            this.loadingUnassigned = true; this.error = '';
+            try { this.unassigned = await window.AdminApi.listUnassignedStudents(); }
             catch (e) { this.error = e.message; }
-            finally { this.loadingStudents = false; }
+            finally { this.loadingUnassigned = false; }
         },
         async loadTemplates() {
             this.loadingTemplates = true; this.error = '';
@@ -209,9 +250,11 @@ function adminDashboard() {
                 await window.AdminApi.updateUserRole(u.id, { role });
                 this.message = 'Role updated.';
                 await this.loadTeachers();
+                if (this.tab === 'unassigned') await this.loadUnassigned();
             } catch (e) {
                 this.error = e.message || 'Role update failed.';
-                await this.loadTeachers(); await this.loadStudents();
+                await this.loadTeachers();
+                if (this.tab === 'unassigned') await this.loadUnassigned();
             }
         },
         async removeUser(u) {
@@ -220,6 +263,7 @@ function adminDashboard() {
                 await window.AdminApi.deleteUser(u.id);
                 this.message = 'User deleted.';
                 await this.loadTeachers();
+                if (this.tab === 'unassigned') await this.loadUnassigned();
             } catch (e) {
                 this.error = e.message || 'Delete failed.';
             }
