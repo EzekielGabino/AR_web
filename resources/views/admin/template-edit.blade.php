@@ -279,14 +279,28 @@ function adminTemplateEdit() {
             try {
                 if (!(this.form.title || '').trim()) throw new Error('Title is required.');
                 this.renumberSteps();
+                const elements = (this.form.elements || []).map((e) => {
+                    const name = (e.name || e.substanceName || '').trim();
+                    let formula = (e.formula || '').trim();
+                    if (!formula && name) formula = name;
+                    return { ...e, name, substanceName: e.substanceName || name, formula };
+                });
+                const steps = (this.form.steps || []).map((s) => {
+                    let elementFormula = (s.elementFormula || '').trim();
+                    if (!elementFormula && (s.action || '') === 'AddElement') {
+                        const hit = elements.find((e) => (e.formula || e.name || '').trim());
+                        if (hit) elementFormula = (hit.formula || hit.name || '').trim();
+                    }
+                    return { ...s, elementFormula };
+                });
                 const body = {
                     title: this.form.title.trim(),
                     labCategory: this.form.labCategory || '',
                     description: this.form.description || '',
                     safetyTips: this.form.safetyTips || '',
                     apparatus: this.form.apparatus || [],
-                    elements: this.form.elements || [],
-                    steps: this.form.steps || [],
+                    elements,
+                    steps,
                     quiz: this.form.quiz || [],
                 };
                 if (this.form.id) {

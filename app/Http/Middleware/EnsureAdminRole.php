@@ -20,6 +20,9 @@ class EnsureAdminRole
         }
 
         $role = strtolower((string) session('user_role', ''));
+        if ($role === 'student') {
+            return redirect()->route('welcome');
+        }
         if ($role !== 'admin') {
             return redirect()->route('dashboard')->withErrors([
                 'email' => 'Admin access only.',

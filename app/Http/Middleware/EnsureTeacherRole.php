@@ -24,10 +24,11 @@ class EnsureTeacherRole
         if ($role === 'admin') {
             return redirect()->route('admin.dashboard');
         }
+        if ($role === 'student') {
+            return redirect()->route('welcome');
+        }
         if (! in_array($role, ['teacher', 'educator', ''], true)) {
-            return redirect()->route('login')->withErrors([
-                'email' => 'Access Restricted: Teachers only. Students use the mobile app.',
-            ]);
+            return redirect()->route('welcome');
         }
 
         return $next($request);

@@ -1021,28 +1021,46 @@
                     displayName: (a.displayName || '').trim(),
                     maxVol: Number(a.maxVol) || 0,
                 }));
-                form.elements = (form.elements || []).map((e) => ({
-                    substanceName: (e.substanceName || '').trim(),
-                    formula: (e.formula || '').trim(),
-                    type: e.type || 'liquid',
-                    role: e.role || 'Neutral',
-                    minVol: Number(e.minVol) || 0,
-                    maxVol: Number(e.maxVol) || 0,
-                    volume: Number(e.volume) || 0,
-                    molarity: Number(e.molarity) || 0,
-                    temperature: Number(e.temperature) || 25,
-                    colorHex: (e.colorHex || '#80B0E0FF').trim(),
-                }));
-                form.steps = (form.steps || []).map((s) => ({
-                    instruction: (s.instruction || '').trim(),
-                    action: s.action || 'PlaceApparatus',
-                    elementFormula: (s.elementFormula || '').trim(),
-                    targetApparatusName: (s.targetApparatusName || '').trim(),
-                    sourceApparatusName: (s.sourceApparatusName || '').trim(),
-                    targetVolume: Number(s.targetVolume) || 0,
-                    waitSeconds: Number(s.waitSeconds) || 0,
-                    reactionColorHex: (s.reactionColorHex || '').trim(),
-                }));
+                form.elements = (form.elements || []).map((e) => {
+                    const substanceName = (e.substanceName || '').trim();
+                    let formula = (e.formula || '').trim();
+                    if (!formula && substanceName) {
+                        formula = substanceName;
+                    }
+                    return {
+                        substanceName,
+                        formula,
+                        type: e.type || 'liquid',
+                        role: e.role || 'Neutral',
+                        minVol: Number(e.minVol) || 0,
+                        maxVol: Number(e.maxVol) || 0,
+                        volume: Number(e.volume) || 0,
+                        molarity: Number(e.molarity) || 0,
+                        temperature: Number(e.temperature) || 25,
+                        colorHex: (e.colorHex || '#80B0E0FF').trim(),
+                    };
+                });
+                form.steps = (form.steps || []).map((s) => {
+                    let elementFormula = (s.elementFormula || '').trim();
+                    if (!elementFormula && (s.action || '') === 'AddElement') {
+                        const hit = (form.elements || []).find((e) =>
+                            (e.formula || e.substanceName || '').trim()
+                        );
+                        if (hit) {
+                            elementFormula = (hit.formula || hit.substanceName || '').trim();
+                        }
+                    }
+                    return {
+                        instruction: (s.instruction || '').trim(),
+                        action: s.action || 'PlaceApparatus',
+                        elementFormula,
+                        targetApparatusName: (s.targetApparatusName || '').trim(),
+                        sourceApparatusName: (s.sourceApparatusName || '').trim(),
+                        targetVolume: Number(s.targetVolume) || 0,
+                        waitSeconds: Number(s.waitSeconds) || 0,
+                        reactionColorHex: (s.reactionColorHex || '').trim(),
+                    };
+                });
                 form.quiz = (form.quiz || []).map((q, i) => ({
                     id: q.id || ('q' + (i + 1)),
                     prompt: (q.prompt || '').trim(),
