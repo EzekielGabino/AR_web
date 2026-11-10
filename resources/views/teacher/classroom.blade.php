@@ -31,6 +31,8 @@
             joinToast: '',
             joinToastTimer: null,
             memberActionUid: null,
+            removeStudentConfirm: null,
+            removeStudentError: '',
             deleteConfirm: null,
             deleteBusy: false,
             deleteError: '',
@@ -1121,16 +1123,30 @@
                     this.memberActionUid = null;
                 }
             },
-            async removeStudent(s) {
+            openRemoveStudent(s) {
                 if (!s?.uid || this.memberActionUid) return;
-                const label = this.studentLabel(s);
-                if (!confirm('Remove ' + label + ' from this class? They will need a new join request to return.')) return;
+                this.removeStudentError = '';
+                this.removeStudentConfirm = s;
+            },
+            closeRemoveStudent() {
+                if (this.memberActionUid) return;
+                this.removeStudentConfirm = null;
+                this.removeStudentError = '';
+            },
+            async removeStudent(s) {
+                this.openRemoveStudent(s);
+            },
+            async confirmRemoveStudent() {
+                const s = this.removeStudentConfirm;
+                if (!s?.uid || this.memberActionUid) return;
                 this.memberActionUid = s.uid;
+                this.removeStudentError = '';
                 try {
                     await window.TeacherClassroom.removeMember(this.classId, s.uid);
+                    this.removeStudentConfirm = null;
                     await this.refreshClass();
                 } catch (e) {
-                    alert(e.message || 'Could not remove student.');
+                    this.removeStudentError = e.message || 'Could not remove student.';
                 } finally {
                     this.memberActionUid = null;
                 }
@@ -1265,6 +1281,35 @@
     @include('teacher.classroom.regular-editor')
     @include('teacher.classroom.qr-modal')
 
+
+
+    {{-- Confirm: Remove enrolled student --}}
+    <div x-show="removeStudentConfirm" x-cloak
+        class="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div class="absolute inset-0 bg-[#091540]/60 backdrop-blur-sm" @click="closeRemoveStudent()"></div>
+        <div class="relative w-full max-w-md rounded-3xl border border-rose-200 bg-white p-6 shadow-2xl">
+            <h3 class="text-lg font-extrabold text-[#091540]">Remove student?</h3>
+            <p class="mt-2 text-sm font-medium text-[#091540]/75">
+                Remove
+                <span class="font-bold text-[#091540]" x-text="studentLabel(removeStudentConfirm)"></span>
+                from this class?
+            </p>
+            <div class="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-900">
+                They will lose access to this classroom on the mobile app and must request to join again to return.
+            </div>
+            <p x-show="removeStudentError" x-text="removeStudentError" class="mt-3 text-xs font-bold text-rose-600"></p>
+            <div class="mt-5 flex flex-wrap justify-end gap-2">
+                <button type="button" @click="closeRemoveStudent()" :disabled="memberActionUid"
+                    class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold text-[#091540] disabled:opacity-50">
+                    Cancel
+                </button>
+                <button type="button" @click="confirmRemoveStudent()" :disabled="memberActionUid"
+                    class="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-rose-700 disabled:opacity-50">
+                    <span x-text="memberActionUid ? 'Removing…' : 'Remove from class'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     {{-- Confirm: Delete announcement / activity --}}
     <div x-show="deleteConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
