@@ -6,9 +6,19 @@
         clientError: '',
         submitting: false,
         online: typeof navigator !== 'undefined' ? navigator.onLine : true,
+        studentNotice: '',
         init() {
             window.addEventListener('online', () => { this.online = true; if (this.clientError.indexOf('internet') !== -1 || this.clientError.indexOf('network') !== -1) this.clientError = ''; });
             window.addEventListener('offline', () => { this.online = false; });
+            try {
+                const q = new URLSearchParams(window.location.search);
+                if (q.get('auth_notice') === 'student') {
+                    this.studentNotice = 'This website is for teachers and admins only. Students sign in on the SciLens AR mobile app.';
+                    q.delete('auth_notice');
+                    const next = window.location.pathname + (q.toString() ? '?' + q.toString() : '') + (window.location.hash || '#login');
+                    window.history.replaceState({}, '', next);
+                }
+            } catch (_) {}
         },
         networkMessage() {
             return 'No internet connection. Check your network and try again.';
@@ -53,6 +63,10 @@
             {{ $errors->first() }}
         </div>
         @endif
+
+        <div x-show="studentNotice" x-cloak
+            class="mb-6 rounded-2xl border border-amber-400/50 bg-amber-500/20 p-4 text-xs font-bold leading-relaxed text-amber-100 backdrop-blur-md"
+            x-text="studentNotice"></div>
 
         <div x-show="clientError" x-cloak
             class="mb-6 rounded-2xl border border-rose-500/40 bg-rose-500/20 p-4 text-xs font-bold leading-relaxed text-rose-200 backdrop-blur-md"

@@ -21,7 +21,7 @@ class EnsureAdminRole
 
         $role = strtolower((string) session('user_role', ''));
         if ($role === 'student') {
-            return redirect()->route('welcome');
+            return redirect()->to(route('welcome').'?auth_notice=student#login');
         }
         if ($role !== 'admin') {
             return redirect()->route('dashboard')->withErrors([

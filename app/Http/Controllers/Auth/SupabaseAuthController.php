@@ -35,14 +35,14 @@ class SupabaseAuthController extends Controller
 
             if ($role === 'student') {
                 return response()->json([
-                    'redirect' => route('welcome'),
+                    'redirect' => route('welcome').'?auth_notice=student#login',
                     'message' => 'Students use the SciLens AR mobile app. The web dashboard is for teachers and admins only.',
                 ]);
             }
 
             if ($role !== 'admin' && $role !== 'teacher' && $role !== 'educator') {
                 return response()->json([
-                    'redirect' => route('welcome'),
+                    'redirect' => route('welcome').'?auth_notice=student#login',
                     'message' => 'Access restricted: the web dashboard is for teachers and admins only.',
                 ]);
             }

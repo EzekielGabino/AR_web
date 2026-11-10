@@ -165,11 +165,15 @@
                                     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                                         <div>
                                             <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#1B2CC1]">Substance name</label>
-                                            <input type="text" x-model="e.substanceName" class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
+                                            <input type="text" x-model="e.substanceName"
+                                                @blur="if (!(e.formula || '').trim() && (e.substanceName || '').trim()) e.formula = (e.substanceName || '').trim()"
+                                                class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
                                         </div>
                                         <div>
                                             <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#1B2CC1]">Formula</label>
-                                            <input type="text" x-model="e.formula" class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
+                                            <input type="text" x-model="e.formula" placeholder="Optional if substance name is set"
+                                                class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold text-[#091540] focus:border-[#1B2CC1] focus:outline-none focus:ring-2 focus:ring-[#7692FF]/20 transition-all">
+                                            <p class="mt-1 text-[10px] font-medium text-[#091540]/55">If empty, substance name is stored as the formula for AR steps.</p>
                                         </div>
                                         <div>
                                             <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-[#1B2CC1]">Type</label>
@@ -297,7 +301,7 @@
                                                         <option :value="opt.value" x-text="opt.label"></option>
                                                     </template>
                                                 </select>
-                                                <p class="mt-1 text-[11px] font-medium text-[#091540]/60">Stored as formula for the AR client. Labels show substance name when formulas repeat.</p>
+                                                <p class="mt-1 text-[11px] font-medium text-[#091540]/60">Uses formula, or substance name when formula is empty. Labels show substance name when values repeat.</p>
                                             </div>
                                             <div>
                                                 <label class="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-[#1B2CC1]">Target volume</label>

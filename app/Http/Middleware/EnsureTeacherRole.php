@@ -25,10 +25,10 @@ class EnsureTeacherRole
             return redirect()->route('admin.dashboard');
         }
         if ($role === 'student') {
-            return redirect()->route('welcome');
+            return redirect()->to(route('welcome').'?auth_notice=student#login');
         }
         if (! in_array($role, ['teacher', 'educator', ''], true)) {
-            return redirect()->route('welcome');
+            return redirect()->to(route('welcome').'?auth_notice=student#login');
         }
 
         return $next($request);
