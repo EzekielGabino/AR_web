@@ -248,6 +248,36 @@ function adminTemplateEdit() {
                 this.loading = false;
             }
         },
+        normalizeApparatus(a) {
+            a = a || {};
+            const key = a.key || a.id || '';
+            const cat = this.apparatusCatalog.find((c) => c.key === key);
+            return {
+                key,
+                displayName: a.displayName || a.name || (cat && cat.displayName) || key,
+                maxVol: Number(a.maxVol ?? a.maxVolume ?? (cat && cat.defaultMaxVol) ?? 0) || 0,
+            };
+        },
+        normalizeElement(e) {
+            e = e || {};
+            const minVol = Number(e.minVol ?? e.minVolume ?? e.min_vol ?? 2);
+            const maxVol = Number(e.maxVol ?? e.maxVolume ?? e.max_vol ?? 50);
+            const volume = Number(e.volume ?? e.defaultVolume ?? e.default_volume ?? 10);
+            const name = e.name || e.substanceName || e.substance_name || '';
+            return {
+                name,
+                substanceName: e.substanceName || e.substance_name || name,
+                formula: e.formula || '',
+                type: e.type || 'liquid',
+                role: e.role || 'Neutral',
+                volume: Number.isFinite(volume) ? volume : 10,
+                minVol: Number.isFinite(minVol) ? minVol : 2,
+                maxVol: Number.isFinite(maxVol) ? maxVol : 50,
+                molarity: Number(e.molarity ?? 0) || 0,
+                temperature: Number(e.temperature ?? 25) || 25,
+                colorHex: e.colorHex || e.color_hex || '#80B0E0FF',
+            };
+        },
         addApparatus() {
             const used = new Set((this.form.apparatus || []).map((a) => a.key));
             const pick = this.apparatusCatalog.find((c) => !used.has(c.key)) || this.apparatusCatalog[0];
