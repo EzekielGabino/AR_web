@@ -89,7 +89,7 @@
                 <div x-show="section === 'elements'" class="space-y-3">
                     <div class="flex justify-between items-center">
                         <p class="text-xs font-bold text-[#1B2CC1]">Elements / substances</p>
-                        <button type="button" @click="form.elements.push({ name: '', formula: '', type: 'liquid', role: 'Neutral', volume: 10, minVolume: 2, maxVolume: 50 })"
+                        <button type="button" @click="form.elements.push({ name: '', substanceName: '', formula: '', type: 'liquid', role: 'Neutral', volume: 10, minVol: 2, maxVol: 50 })"
                             class="rounded-xl bg-[#ABD2FA]/30 px-3 py-1.5 text-xs font-bold text-[#1B2CC1]">+ Add</button>
                     </div>
                     <template x-for="(el, i) in form.elements" :key="i">
@@ -116,9 +116,9 @@
                                 </select>
                             </div>
                             <div class="grid grid-cols-3 gap-2">
-                                <label class="text-[10px] font-bold">Vol<input type="number" x-model.number="el.volume" class="mt-0.5 w-full rounded-lg border border-[#ABD2FA] px-2 py-1 text-xs"></label>
-                                <label class="text-[10px] font-bold">Min<input type="number" x-model.number="el.minVolume" class="mt-0.5 w-full rounded-lg border border-[#ABD2FA] px-2 py-1 text-xs"></label>
-                                <label class="text-[10px] font-bold">Max<input type="number" x-model.number="el.maxVolume" class="mt-0.5 w-full rounded-lg border border-[#ABD2FA] px-2 py-1 text-xs"></label>
+                                <label class="text-[10px] font-bold">Default vol<input type="number" x-model.number="el.volume" min="0" class="mt-0.5 w-full rounded-lg border border-[#ABD2FA] px-2 py-1 text-xs"></label>
+                                <label class="text-[10px] font-bold">Min<input type="number" x-model.number="el.minVol" min="0" class="mt-0.5 w-full rounded-lg border border-[#ABD2FA] px-2 py-1 text-xs"></label>
+                                <label class="text-[10px] font-bold">Max<input type="number" x-model.number="el.maxVol" min="0" class="mt-0.5 w-full rounded-lg border border-[#ABD2FA] px-2 py-1 text-xs"></label>
                             </div>
                         </div>
                     </template>
@@ -237,8 +237,8 @@ function adminTemplateEdit() {
                     labCategory: t.labCategory || '',
                     description: t.description || '',
                     safetyTips: t.safetyTips || '',
-                    apparatus: Array.isArray(t.apparatus) ? t.apparatus : [],
-                    elements: Array.isArray(t.elements) ? t.elements : [],
+                    apparatus: Array.isArray(t.apparatus) ? t.apparatus.map((a) => this.normalizeApparatus(a)) : [],
+                    elements: Array.isArray(t.elements) ? t.elements.map((e) => this.normalizeElement(e)) : [],
                     steps: Array.isArray(t.steps) ? t.steps : [],
                     quiz: Array.isArray(t.quiz) ? t.quiz : [],
                 };
@@ -283,7 +283,21 @@ function adminTemplateEdit() {
                     const name = (e.name || e.substanceName || '').trim();
                     let formula = (e.formula || '').trim();
                     if (!formula && name) formula = name;
-                    return { ...e, name, substanceName: e.substanceName || name, formula };
+                    const minVol = Number(e.minVol ?? e.minVolume);
+                    const maxVol = Number(e.maxVol ?? e.maxVolume);
+                    const volume = Number(e.volume);
+                    return {
+                        ...e,
+                        name,
+                        substanceName: e.substanceName || name,
+                        formula,
+                        minVol: Number.isFinite(minVol) ? minVol : 2,
+                        maxVol: Number.isFinite(maxVol) ? maxVol : 50,
+                        volume: Number.isFinite(volume) ? volume : 10,
+                        // keep aliases so older readers still work
+                        minVolume: Number.isFinite(minVol) ? minVol : 2,
+                        maxVolume: Number.isFinite(maxVol) ? maxVol : 50,
+                    };
                 });
                 const steps = (this.form.steps || []).map((s) => {
                     let elementFormula = (s.elementFormula || '').trim();
