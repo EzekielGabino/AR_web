@@ -99,6 +99,7 @@ Route::middleware([EnsureFirebaseSessionIsValid::class])->group(function () {
             Route::get('/students/unassigned', [AdminDataController::class, 'listUnassignedStudents']);
             Route::post('/users', [AdminDataController::class, 'createUser']);
             Route::patch('/users/{id}/role', [AdminDataController::class, 'updateUserRole']);
+            Route::patch('/users/{id}/email', [AdminDataController::class, 'updateUserEmail']);
             Route::delete('/users/{id}', [AdminDataController::class, 'deleteUser']);
             Route::post('/classes', [AdminDataController::class, 'storeClass']);
             Route::patch('/classes/{id}', [AdminDataController::class, 'updateClass']);

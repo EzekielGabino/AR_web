@@ -595,6 +595,74 @@ class AdminDataController extends Controller
         ]);
     }
 
+    /**
+     * Update a user's email in Auth + profiles so Google / email login can use the new address.
+     * Note: an existing Google identity on another account for the same email cannot be merged here.
+     */
+    public function updateUserEmail(Request $request, string $id)
+    {
+        $data = $request->validate([
+            'email' => 'required|email|max:255',
+        ]);
+        $email = strtolower(trim($data['email']));
+
+        $rows = $this->db->get('profiles', ['id' => 'eq.'.$id, 'limit' => 1]);
+        if (! $rows) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        $current = strtolower(trim((string) ($rows[0]['email'] ?? '')));
+        if ($current === $email) {
+            return response()->json([
+                'id' => $id,
+                'email' => $email,
+                'message' => 'Email unchanged.',
+            ]);
+        }
+
+        $taken = $this->db->get('profiles', [
+            'email' => 'eq.'.$email,
+            'select' => 'id',
+            'limit' => 1,
+        ]);
+        if ($taken && ($taken[0]['id'] ?? null) !== $id) {
+            return response()->json([
+                'message' => 'That email is already used by another account.',
+            ], 422);
+        }
+
+        $url = \App\Services\Supabase\SupabaseClient::normalizeProjectUrl((string) config('supabase.url'));
+        $serviceKey = (string) config('supabase.service_role_key');
+
+        $response = \Illuminate\Support\Facades\Http::baseUrl($url)
+            ->withHeaders([
+                'apikey' => $serviceKey,
+                'Authorization' => 'Bearer '.$serviceKey,
+                'Content-Type' => 'application/json',
+            ])
+            ->put('/auth/v1/admin/users/'.$id, [
+                'email' => $email,
+                'email_confirm' => true,
+            ]);
+
+        if (! $response->successful()) {
+            return response()->json([
+                'message' => 'Could not update auth email: '.$response->body(),
+            ], 422);
+        }
+
+        $this->db->update('profiles', 'id', $id, [
+            'email' => $email,
+            'updated_at' => now()->toIso8601String(),
+        ]);
+
+        return response()->json([
+            'id' => $id,
+            'email' => $email,
+            'message' => 'Email updated. The teacher should sign in with Google using this address.',
+        ]);
+    }
+
     public function deleteUser(string $id)
     {
         $self = session('auth_uid') ?: session('firebase_uid');

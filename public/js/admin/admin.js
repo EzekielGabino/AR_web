@@ -54,6 +54,12 @@ export async function updateUserRole(id, body) {
         body: JSON.stringify(body),
     });
 }
+export async function updateUserEmail(id, body) {
+    return api('/api/admin/users/' + encodeURIComponent(id) + '/email', {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+    });
+}
 export async function deleteUser(id) {
     return api('/api/admin/users/' + encodeURIComponent(id), { method: 'DELETE' });
 }
@@ -97,6 +103,7 @@ window.AdminApi = {
     listUnassignedStudents,
     createUser,
     updateUserRole,
+    updateUserEmail,
     deleteUser,
     createClass,
     updateClass,
