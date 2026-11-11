@@ -162,7 +162,7 @@
                 { key: 'test_tube', displayName: 'Test Tube', defaultMaxVol: 50 },
                 { key: 'test_tube_rack', displayName: 'Test Tube Rack', defaultMaxVol: 6 },
                 { key: 'stirring_rod', displayName: 'Stirring Rod', defaultMaxVol: 0 },
-                { key: 'conical_flask', displayName: 'Conical Flask', defaultMaxVol: 250 },
+                { key: 'flask', displayName: 'Conical Flask', defaultMaxVol: 250 },
                 { key: 'pipette', displayName: 'Pipette', defaultMaxVol: 10 },
             ],
             async init() {
