@@ -3,7 +3,7 @@
 @section('title', 'Teacher - Admin')
 
 @section('content')
-<div class="min-h-screen bg-slate-50 text-[#091540]" x-data="adminTeacher()" x-init="init()">
+<div class="min-h-screen bg-slate-50 text-[#091540]" x-data="adminTeacher(@js($teacherId))" x-init="init()">
     @include('admin.partials.topbar')
     <div class="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
         <a href="{{ route('admin.dashboard') }}?tab=teachers" class="text-xs font-bold text-[#1B2CC1]">← Teachers</a>
@@ -71,9 +71,160 @@
                     <div>
                         <label class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#091540]/70">Academic year</label>
                         <select x-model="classForm.academic_year"
-                            class="w-full rounded-xl border border-[#ABD2FA] px-3 py-2 text-xs font-bold bg-white">
+                            class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2 text-xs font-bold">
                             <option value="" disabled>Select school year</option>
                             <template x-for="y in academicYearOptions()" :key="y">
                                 <option :value="y" x-text="y"></option>
                             </template>
                         </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#091540]/70">Access code</label>
+                    <input type="text" x-model="classForm.access_code" class="w-full rounded-xl border border-[#ABD2FA] px-3 py-2 font-mono text-xs font-bold uppercase">
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#091540]/70">Subject (optional)</label>
+                    <input type="text" x-model="classForm.subject" class="w-full rounded-xl border border-[#ABD2FA] px-3 py-2 text-xs font-bold">
+                </div>
+            </div>
+            <p x-show="classError" x-text="classError" class="mt-3 text-xs font-bold text-rose-600"></p>
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" @click="classModal = false" class="rounded-xl border border-[#ABD2FA] px-4 py-2 text-xs font-bold">Cancel</button>
+                <button type="button" @click="saveClass()" :disabled="classSaving || !(classForm.section_name || '').trim()"
+                    class="rounded-xl bg-[#1B2CC1] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                    <span x-text="classSaving ? 'Saving…' : 'Save'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="{{ asset('js/admin/admin.js') }}"></script>
+<script>
+window.adminTeacher = function (teacherId) {
+    return {
+        teacherId: teacherId,
+        loading: true,
+        error: '',
+        message: '',
+        teacher: null,
+        classes: [],
+        classModal: false,
+        classSaving: false,
+        classError: '',
+        classForm: {
+            id: null,
+            section_name: '',
+            grade_level: 'Grade 8',
+            academic_year: '',
+            subject: '',
+            access_code: '',
+        },
+        academicYearOptions() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = now.getMonth();
+            const latestStart = m >= 5 ? y : y - 1;
+            const years = [];
+            for (let start = 2015; start <= latestStart; start++) {
+                years.push(start + '-' + (start + 1));
+            }
+            return years.reverse();
+        },
+        defaultAcademicYear() {
+            const opts = this.academicYearOptions();
+            return opts.length ? opts[0] : '';
+        },
+        async init() {
+            this.loading = true;
+            this.error = '';
+            try {
+                let n = 0;
+                while (!window.AdminApi && n < 100) {
+                    await new Promise((r) => setTimeout(r, 40));
+                    n++;
+                }
+                if (!window.AdminApi) throw new Error('Admin module failed to load');
+                await this.reload();
+            } catch (e) {
+                this.error = e.message || 'Failed to load teacher.';
+            } finally {
+                this.loading = false;
+            }
+        },
+        async reload() {
+            const data = await window.AdminApi.showTeacher(this.teacherId);
+            this.teacher = data.teacher || data;
+            this.classes = data.classes || this.teacher.classes || [];
+        },
+        openClassModal(c) {
+            this.classError = '';
+            this.message = '';
+            if (c && c.id) {
+                this.classForm = {
+                    id: c.id,
+                    section_name: c.section_name || '',
+                    grade_level: c.grade_level || 'Grade 8',
+                    academic_year: c.academic_year || this.defaultAcademicYear(),
+                    subject: c.subject || '',
+                    access_code: c.access_code || '',
+                };
+            } else {
+                this.classForm = {
+                    id: null,
+                    section_name: '',
+                    grade_level: 'Grade 8',
+                    academic_year: this.defaultAcademicYear(),
+                    subject: '',
+                    access_code: '',
+                };
+            }
+            this.classModal = true;
+        },
+        async saveClass() {
+            this.classSaving = true;
+            this.classError = '';
+            try {
+                if (this.classForm.id) {
+                    await window.AdminApi.updateClass(this.classForm.id, {
+                        section_name: this.classForm.section_name,
+                        grade_level: this.classForm.grade_level,
+                        academic_year: this.classForm.academic_year,
+                        subject: this.classForm.subject,
+                        access_code: this.classForm.access_code,
+                    });
+                    this.message = 'Class updated.';
+                } else {
+                    await window.AdminApi.createClass({
+                        teacher_id: this.teacherId,
+                        section_name: this.classForm.section_name,
+                        grade_level: this.classForm.grade_level,
+                        academic_year: this.classForm.academic_year,
+                        subject: this.classForm.subject,
+                        access_code: this.classForm.access_code,
+                    });
+                    this.message = 'Class created.';
+                }
+                this.classModal = false;
+                await this.reload();
+            } catch (e) {
+                this.classError = e.message || 'Save failed.';
+            } finally {
+                this.classSaving = false;
+            }
+        },
+        async removeClass(c) {
+            if (!confirm('Delete class "' + (c.section_name || '') + '"? Students in this class will be unassigned.')) return;
+            try {
+                await window.AdminApi.deleteClass(c.id);
+                this.message = 'Class deleted.';
+                await this.reload();
+            } catch (e) {
+                this.error = e.message || 'Delete failed.';
+            }
+        },
+    };
+};
+</script>
+@endsection
