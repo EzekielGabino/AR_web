@@ -20,11 +20,20 @@
             await this.load();
         },
         defaultAcademicYear() {
+            const opts = this.academicYearOptions();
+            return opts.length ? opts[0] : '';
+        },
+        // SY list: 2015-2016 … current. From June (month index 5), include the new SY.
+        academicYearOptions() {
             const now = new Date();
             const y = now.getFullYear();
             const m = now.getMonth();
-            const start = m >= 5 ? y : y - 1;
-            return start + '-' + (start + 1);
+            const latestStart = m >= 5 ? y : y - 1;
+            const years = [];
+            for (let start = 2015; start <= latestStart; start++) {
+                years.push(start + '-' + (start + 1));
+            }
+            return years.reverse();
         },
         filteredClasses() {
             return (this.classes || []).filter((c) => {
@@ -42,9 +51,8 @@
             return allowed.filter((g) => set.has(g));
         },
         yearOptions() {
-            const set = new Set();
+            const set = new Set(this.academicYearOptions());
             (this.classes || []).forEach((c) => { if (c.academic_year) set.add(c.academic_year); });
-            set.add(this.defaultAcademicYear());
             return Array.from(set).sort().reverse();
         },
         async load() {
@@ -310,8 +318,13 @@
                     </div>
                     <div>
                         <label class="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#091540]/70">Academic year</label>
-                        <input type="text" x-model="form.academic_year" placeholder="2025-2026" required
-                            class="w-full rounded-2xl border-[1.5px] border-[#ABD2FA]/80 bg-slate-50/50 px-4 py-3 text-xs font-bold text-[#091540] placeholder:text-slate-400 focus:border-[#1B2CC1] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#7692FF]/20 transition-all">
+                        <select x-model="form.academic_year" required
+                            class="w-full rounded-xl border border-[#ABD2FA] bg-white px-3 py-2.5 text-xs font-bold text-[#091540] outline-none focus:border-[#1B2CC1] focus:ring-2 focus:ring-[#7692FF]/30">
+                            <option value="" disabled>Select school year</option>
+                            <template x-for="y in academicYearOptions()" :key="y">
+                                <option :value="y" x-text="y"></option>
+                            </template>
+                        </select>
                     </div>
                 </div>
                 <div>
